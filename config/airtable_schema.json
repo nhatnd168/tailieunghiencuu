@@ -1,0 +1,258 @@
+{
+  "database_name": "Lead Generation CRM",
+  "tables": [
+    {
+      "name": "Leads",
+      "description": "Main CRM table tracking all leads through the full pipeline",
+      "fields": [
+        {
+          "name": "Name",
+          "type": "singleLineText",
+          "description": "Full name of the lead",
+          "required": true
+        },
+        {
+          "name": "Email",
+          "type": "email",
+          "description": "Business email address (primary key for deduplication)",
+          "required": true
+        },
+        {
+          "name": "Company",
+          "type": "singleLineText",
+          "description": "Company/Organization name",
+          "required": true
+        },
+        {
+          "name": "Title",
+          "type": "singleLineText",
+          "description": "Job title / position"
+        },
+        {
+          "name": "Industry",
+          "type": "singleLineText",
+          "description": "Industry from Apollo"
+        },
+        {
+          "name": "Website",
+          "type": "url",
+          "description": "Company website URL"
+        },
+        {
+          "name": "LinkedIn_URL",
+          "type": "url",
+          "description": "LinkedIn profile URL"
+        },
+        {
+          "name": "Country",
+          "type": "singleLineText",
+          "description": "Country/Location of lead"
+        },
+        {
+          "name": "Apollo_ID",
+          "type": "singleLineText",
+          "description": "Apollo.io unique person ID - used for deduplication"
+        },
+        {
+          "name": "AI_Score",
+          "type": "number",
+          "description": "AI-generated fit score 1-10. Leads below 7 are auto-filtered.",
+          "options": {
+            "precision": 0
+          }
+        },
+        {
+          "name": "AI_Score_Reasoning",
+          "type": "multilineText",
+          "description": "AI explanation of why this lead received this score"
+        },
+        {
+          "name": "AI_Fit_Factors",
+          "type": "singleLineText",
+          "description": "Key factors that make this lead a good fit (comma-separated)"
+        },
+        {
+          "name": "Status",
+          "type": "singleSelect",
+          "description": "Current pipeline status of the lead",
+          "options": {
+            "choices": [
+              {
+                "name": "Pending Review",
+                "color": "yellowLight2",
+                "description": "AI scored >= 7, waiting for human approval in Airtable"
+              },
+              {
+                "name": "Approved",
+                "color": "greenLight2",
+                "description": "Approved by human - WF2 will pick up and send email"
+              },
+              {
+                "name": "Rejected",
+                "color": "redLight2",
+                "description": "Rejected by human - will not receive any email"
+              },
+              {
+                "name": "Email Sent",
+                "color": "blueLight2",
+                "description": "Initial email sent - WF3 will handle follow-ups"
+              },
+              {
+                "name": "Follow-up 1 Sent",
+                "color": "blue",
+                "description": "First follow-up sent (3 days after initial)"
+              },
+              {
+                "name": "Follow-up 2 Sent",
+                "color": "blueDark1",
+                "description": "Second follow-up sent (5 days after first follow-up)"
+              },
+              {
+                "name": "Follow-up 3 Sent",
+                "color": "grayDark1",
+                "description": "Third and final follow-up sent (7 days after second)"
+              },
+              {
+                "name": "Replied - Interested",
+                "color": "greenDark1",
+                "description": "Lead replied and expressed interest - TAKE ACTION NOW"
+              },
+              {
+                "name": "Replied - Not Interested",
+                "color": "redDark1",
+                "description": "Lead replied and declined - archive"
+              },
+              {
+                "name": "Replied - Wrong Person",
+                "color": "orangeDark1",
+                "description": "Replied saying wrong contact - find right person"
+              },
+              {
+                "name": "Replied - On Leave",
+                "color": "purpleLight2",
+                "description": "Auto-reply or on leave - will follow up again after return"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Email_Subject",
+          "type": "singleLineText",
+          "description": "Subject line of the initial email sent"
+        },
+        {
+          "name": "Email_Thread_ID",
+          "type": "singleLineText",
+          "description": "Gmail thread ID for reply tracking and sending follow-ups in same thread"
+        },
+        {
+          "name": "Email_Sent_Date",
+          "type": "date",
+          "description": "Date when the initial email was sent",
+          "options": {
+            "dateFormat": "YYYY-MM-DD"
+          }
+        },
+        {
+          "name": "Last_Email_Date",
+          "type": "date",
+          "description": "Date when the most recent email (initial or follow-up) was sent",
+          "options": {
+            "dateFormat": "YYYY-MM-DD"
+          }
+        },
+        {
+          "name": "Follow_up_Count",
+          "type": "number",
+          "description": "Number of follow-up emails sent (max 3)",
+          "options": {
+            "precision": 0
+          }
+        },
+        {
+          "name": "Reply_Intent",
+          "type": "singleSelect",
+          "description": "AI-classified intent of the reply email",
+          "options": {
+            "choices": [
+              {"name": "Interested", "color": "greenDark1"},
+              {"name": "Not Interested", "color": "redLight2"},
+              {"name": "Wrong Person", "color": "orangeLight2"},
+              {"name": "On Leave", "color": "purpleLight2"}
+            ]
+          }
+        },
+        {
+          "name": "Reply_Summary",
+          "type": "singleLineText",
+          "description": "AI-generated Vietnamese summary of what the reply said"
+        },
+        {
+          "name": "Last_Reply_Content",
+          "type": "multilineText",
+          "description": "First 500 characters of the most recent reply email body"
+        },
+        {
+          "name": "Reply_Date",
+          "type": "date",
+          "description": "Date when the lead replied",
+          "options": {
+            "dateFormat": "YYYY-MM-DD"
+          }
+        },
+        {
+          "name": "Notes",
+          "type": "multilineText",
+          "description": "Manual notes from sales team"
+        },
+        {
+          "name": "Created_Date",
+          "type": "date",
+          "description": "Date when this record was created (lead discovered)",
+          "options": {
+            "dateFormat": "YYYY-MM-DD"
+          }
+        }
+      ],
+      "views": [
+        {
+          "name": "📋 All Leads",
+          "type": "grid",
+          "description": "All leads sorted by AI score"
+        },
+        {
+          "name": "🔔 Pending Review",
+          "type": "grid",
+          "description": "Leads waiting for approval",
+          "filterByFormula": "{Status}='Pending Review'",
+          "sort": [{"field": "AI_Score", "direction": "desc"}]
+        },
+        {
+          "name": "✅ Approved Queue",
+          "type": "grid",
+          "description": "Approved leads ready for email sending",
+          "filterByFormula": "{Status}='Approved'"
+        },
+        {
+          "name": "📧 Active Campaign",
+          "type": "grid",
+          "description": "Leads currently in the email sequence",
+          "filterByFormula": "OR({Status}='Email Sent', {Status}='Follow-up 1 Sent', {Status}='Follow-up 2 Sent', {Status}='Follow-up 3 Sent')"
+        },
+        {
+          "name": "🔥 Interested - Act Now!",
+          "type": "grid",
+          "description": "HOT leads who replied with interest",
+          "filterByFormula": "{Status}='Replied - Interested'",
+          "sort": [{"field": "Reply_Date", "direction": "desc"}]
+        },
+        {
+          "name": "📊 Pipeline Overview",
+          "type": "kanban",
+          "groupByField": "Status",
+          "description": "Kanban view of all leads by status"
+        }
+      ]
+    }
+  ]
+}

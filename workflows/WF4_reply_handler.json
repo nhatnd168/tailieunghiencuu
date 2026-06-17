@@ -1,0 +1,366 @@
+{
+  "name": "WF4 - Reply Handler & Intent Classifier",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "filters": {
+          "readStatus": "unread",
+          "labelIds": ["INBOX"]
+        },
+        "options": {
+          "dataPropertyAttachmentsPrefixName": "attachment_"
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GMAIL_CRED_ID",
+          "name": "Gmail Account"
+        }
+      },
+      "id": "d4e5f6a7-0001-0001-0001-000000000001",
+      "name": "Gmail Trigger - New Emails",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract and validate email reply information\nconst email = $input.item.json;\n\n// Get email details\nconst from = email.from || '';\nconst subject = email.subject || '';\nconst body = email.text || email.snippet || '';\nconst htmlBody = email.html || '';\nconst messageId = email.id || '';\nconst threadId = email.threadId || '';\nconst labels = email.labelIds || [];\n\n// Extract sender email address\nconst emailMatch = from.match(/<([^>]+)>/) || [null, from];\nconst senderEmail = emailMatch[1] || from;\nconst senderName = from.replace(/<[^>]+>/, '').trim().replace(/\"/g, '');\n\n// Check if this could be a reply to our campaign\n// Look for Re: in subject or check if it's a thread reply\nconst isReply = subject.toLowerCase().startsWith('re:') || \n                subject.toLowerCase().startsWith('fwd:') ||\n                (threadId && threadId !== messageId);\n\n// Skip emails FROM ourselves\nconst myEmail = 'YOUR_EMAIL@gmail.com'; // Replace with your Gmail\nif (senderEmail.toLowerCase() === myEmail.toLowerCase()) {\n  return [];\n}\n\n// Skip if no body (empty emails)\nif (!body && !htmlBody) {\n  return [];\n}\n\n// Clean body text - remove HTML tags and excessive whitespace\nconst cleanBody = (htmlBody || body)\n  .replace(/<[^>]*>/g, ' ')\n  .replace(/&nbsp;/g, ' ')\n  .replace(/&amp;/g, '&')\n  .replace(/&lt;/g, '<')\n  .replace(/&gt;/g, '>')\n  .replace(/\\s+/g, ' ')\n  .trim()\n  .substring(0, 2000); // Limit to 2000 chars for AI\n\nconsole.log(`Processing email from: ${senderEmail}, subject: ${subject}`);\n\nreturn [{\n  json: {\n    message_id: messageId,\n    thread_id: threadId,\n    sender_email: senderEmail.toLowerCase().trim(),\n    sender_name: senderName,\n    subject,\n    body_clean: cleanBody,\n    is_reply: isReply,\n    received_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "d4e5f6a7-0002-0002-0002-000000000002",
+      "name": "Extract Email Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "YOUR_AIRTABLE_BASE_ID",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "name"
+        },
+        "filterByFormula": "={Email}='{{ $json.sender_email }}'",
+        "options": {
+          "fields": ["Name", "Email", "Company", "Title", "Status", "Email_Thread_ID", "Follow_up_Count"]
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "AIRTABLE_CRED_ID",
+          "name": "Airtable Token"
+        }
+      },
+      "id": "d4e5f6a7-0003-0003-0003-000000000003",
+      "name": "Airtable - Find Lead by Email",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine email data with lead data from Airtable\nconst emailData = $('Extract Email Info').item.json;\nconst searchResults = $input.all();\n\n// Check if we found a matching lead\nconst leadFound = searchResults.length > 0 && searchResults[0].json.id !== undefined;\n\nif (!leadFound) {\n  return [{ json: { ...emailData, lead_found: false } }];\n}\n\nconst lead = searchResults[0].json;\nconst fields = lead.fields || lead;\n\nreturn [{\n  json: {\n    ...emailData,\n    lead_found: true,\n    record_id: lead.id,\n    lead_name: fields.Name || '',\n    lead_company: fields.Company || '',\n    lead_title: fields.Title || '',\n    lead_status: fields.Status || '',\n    lead_thread_id: fields.Email_Thread_ID || ''\n  }\n}];"
+      },
+      "id": "d4e5f6a7-0004-0004-0004-000000000004",
+      "name": "Match Lead Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "lead-found-check",
+              "leftValue": "={{ $json.lead_found }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "d4e5f6a7-0005-0005-0005-000000000005",
+      "name": "Lead Found in CRM?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare intent classification prompt\nconst data = $json;\n\nconst classificationPrompt = `Phân tích email reply sau và phân loại ý định của người gửi.\n\nNgữ cảnh: Đây là reply của lead cho một chiến dịch cold email B2B.\n\nThông tin lead:\n- Tên: ${data.lead_name}\n- Công ty: ${data.lead_company}\n- Chức danh: ${data.lead_title}\n\nEmail reply:\n- Tiêu đề: ${data.subject}\n- Nội dung: ${data.body_clean}\n\nHãy phân loại ý định thành CHÍNH XÁC MỘT trong 4 loại:\n- \"Interested\" (Quan tâm): Người muốn biết thêm, muốn schedule call, hoặc rõ ràng open với offer\n- \"Not Interested\" (Không quan tâm): Người từ chối rõ ràng, không có nhu cầu, hoặc đã có giải pháp khác\n- \"Wrong Person\" (Nhầm người): Người nói họ không phụ trách, chuyển tiếp cho người khác, hoặc yêu cầu liên hệ người khác\n- \"On Leave\" (Đang nghỉ): Auto-reply khi nghỉ phép, hoặc người nói đang nghỉ/bận\n\nTrả về CHÍNH XÁC JSON sau (không có text khác):\n{\n  \"intent\": \"<một trong: Interested | Not Interested | Wrong Person | On Leave>\",\n  \"confidence\": <số từ 0-1>,\n  \"summary_vi\": \"<tóm tắt ngắn bằng tiếng Việt, 1-2 câu>\",\n  \"next_action\": \"<hành động tiếp theo được khuyến nghị>\",\n  \"is_auto_reply\": <true|false>\n}`;\n\nreturn [{ json: { ...data, classificationPrompt } }];"
+      },
+      "id": "d4e5f6a7-0006-0006-0006-000000000006",
+      "name": "Prepare Classification Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'system', content: 'Bạn là chuyên gia phân tích email B2B. Luôn trả về JSON hợp lệ với phân loại chính xác.' }, { role: 'user', content: $json.classificationPrompt }], response_format: { type: 'json_object' }, temperature: 0.1, max_tokens: 300 }) }}"
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "OPENAI_CRED_ID",
+          "name": "OpenAI API"
+        }
+      },
+      "id": "d4e5f6a7-0007-0007-0007-000000000007",
+      "name": "AI - Classify Intent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI classification response\nconst data = $('Prepare Classification Prompt').item.json;\nconst aiResponse = $input.item.json;\n\nlet classification = { \n  intent: 'Not Interested', \n  confidence: 0.5, \n  summary_vi: 'Không thể phân loại', \n  next_action: 'Review thủ công',\n  is_auto_reply: false\n};\n\ntry {\n  const content = aiResponse.choices?.[0]?.message?.content || '{}';\n  classification = JSON.parse(content);\n} catch (e) {\n  console.error('Failed to parse classification:', e);\n}\n\n// Normalize intent to match our CRM statuses\nconst intentMap = {\n  'Interested': 'Replied - Interested',\n  'Not Interested': 'Replied - Not Interested',\n  'Wrong Person': 'Replied - Wrong Person',\n  'On Leave': 'Replied - On Leave'\n};\n\nconst crmStatus = intentMap[classification.intent] || 'Replied - Not Interested';\n\nconsole.log(`Intent classified: ${classification.intent} (${classification.confidence}) for ${data.lead_name}`);\n\nreturn [{\n  json: {\n    ...data,\n    intent: classification.intent,\n    crm_status: crmStatus,\n    confidence: classification.confidence,\n    summary_vi: classification.summary_vi,\n    next_action: classification.next_action,\n    is_auto_reply: classification.is_auto_reply || false\n  }\n}];"
+      },
+      "id": "d4e5f6a7-0008-0008-0008-000000000008",
+      "name": "Parse Intent Classification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 220]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "YOUR_AIRTABLE_BASE_ID",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "name"
+        },
+        "id": "={{ $json.record_id }}",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "={{ $json.crm_status }}",
+            "Reply_Intent": "={{ $json.intent }}",
+            "Last_Reply_Content": "={{ $json.body_clean.substring(0, 500) }}",
+            "Reply_Summary": "={{ $json.summary_vi }}",
+            "Reply_Date": "={{ new Date().toISOString().split('T')[0] }}"
+          }
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "AIRTABLE_CRED_ID",
+          "name": "Airtable Token"
+        }
+      },
+      "id": "d4e5f6a7-0009-0009-0009-000000000009",
+      "name": "Airtable - Update Lead Status",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [2000, 220]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.intent }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "Interested",
+              "output": 0
+            },
+            {
+              "value2": "Not Interested",
+              "output": 1
+            },
+            {
+              "value2": "Wrong Person",
+              "output": 2
+            },
+            {
+              "value2": "On Leave",
+              "output": 3
+            }
+          ]
+        },
+        "fallbackOutput": 1
+      },
+      "id": "d4e5f6a7-0010-0010-0010-000000000010",
+      "name": "Route by Intent",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [2220, 220]
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ '🔥🔥🔥 *HOT LEAD - QUAN TÂM!*\\n\\n👤 *' + $json.lead_name + '*\\n🏢 ' + $json.lead_company + '\\n💼 ' + $json.lead_title + '\\n\\n📧 Reply từ: ' + $json.sender_email + '\\n📋 *Tóm tắt:* ' + $json.summary_vi + '\\n\\n📌 *Hành động tiếp theo:* ' + $json.next_action + '\\n\\n💬 Nội dung reply:\\n\"' + $json.body_clean.substring(0, 300) + '\"\\n\\n➡️ *Kiểm tra Airtable và REPLY NGAY!*' }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_CRED_ID",
+          "name": "Telegram Bot"
+        }
+      },
+      "id": "d4e5f6a7-0011-0011-0011-000000000011",
+      "name": "Telegram - INTERESTED Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2440, 60]
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ '❌ *Không quan tâm*\\n\\n👤 ' + $json.lead_name + ' - ' + $json.lead_company + '\\n📧 ' + $json.sender_email + '\\n\\n📋 ' + $json.summary_vi + '\\n\\n✅ Đã cập nhật Airtable tự động.' }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_CRED_ID",
+          "name": "Telegram Bot"
+        }
+      },
+      "id": "d4e5f6a7-0012-0012-0012-000000000012",
+      "name": "Telegram - Not Interested",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2440, 200]
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ '⚠️ *Nhầm người*\\n\\n👤 ' + $json.lead_name + ' - ' + $json.lead_company + '\\n📧 ' + $json.sender_email + '\\n\\n📋 ' + $json.summary_vi + '\\n\\n📌 *Hành động:* ' + $json.next_action + '\\n\\n✅ Đã cập nhật Airtable. Cần tìm đúng người phụ trách.' }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_CRED_ID",
+          "name": "Telegram Bot"
+        }
+      },
+      "id": "d4e5f6a7-0013-0013-0013-000000000013",
+      "name": "Telegram - Wrong Person",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2440, 340]
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ '🏖️ *Đang nghỉ phép*\\n\\n👤 ' + $json.lead_name + ' - ' + $json.lead_company + '\\n📧 ' + $json.sender_email + '\\n\\n📋 ' + $json.summary_vi + '\\n\\n📌 *Hành động:* ' + $json.next_action + '\\n\\n✅ Đã cập nhật Airtable. WF3 sẽ tự động follow-up lại sau.' }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_CRED_ID",
+          "name": "Telegram Bot"
+        }
+      },
+      "id": "d4e5f6a7-0014-0014-0014-000000000014",
+      "name": "Telegram - On Leave",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2440, 480]
+    },
+    {
+      "parameters": {},
+      "id": "d4e5f6a7-0015-0015-0015-000000000015",
+      "name": "Skip - Not Our Campaign",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1340, 400]
+    }
+  ],
+  "connections": {
+    "Gmail Trigger - New Emails": {
+      "main": [[{"node": "Extract Email Info", "type": "main", "index": 0}]]
+    },
+    "Extract Email Info": {
+      "main": [[{"node": "Airtable - Find Lead by Email", "type": "main", "index": 0}]]
+    },
+    "Airtable - Find Lead by Email": {
+      "main": [[{"node": "Match Lead Data", "type": "main", "index": 0}]]
+    },
+    "Match Lead Data": {
+      "main": [[{"node": "Lead Found in CRM?", "type": "main", "index": 0}]]
+    },
+    "Lead Found in CRM?": {
+      "main": [
+        [{"node": "Prepare Classification Prompt", "type": "main", "index": 0}],
+        [{"node": "Skip - Not Our Campaign", "type": "main", "index": 0}]
+      ]
+    },
+    "Prepare Classification Prompt": {
+      "main": [[{"node": "AI - Classify Intent", "type": "main", "index": 0}]]
+    },
+    "AI - Classify Intent": {
+      "main": [[{"node": "Parse Intent Classification", "type": "main", "index": 0}]]
+    },
+    "Parse Intent Classification": {
+      "main": [[{"node": "Airtable - Update Lead Status", "type": "main", "index": 0}]]
+    },
+    "Airtable - Update Lead Status": {
+      "main": [[{"node": "Route by Intent", "type": "main", "index": 0}]]
+    },
+    "Route by Intent": {
+      "main": [
+        [{"node": "Telegram - INTERESTED Alert", "type": "main", "index": 0}],
+        [{"node": "Telegram - Not Interested", "type": "main", "index": 0}],
+        [{"node": "Telegram - Wrong Person", "type": "main", "index": 0}],
+        [{"node": "Telegram - On Leave", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "versionId": "wf4-reply-handler-v1",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "n8n-lead-automation"
+  },
+  "pinData": {},
+  "tags": [
+    {"name": "Reply Handler", "createdAt": "2024-01-01T00:00:00.000Z"}
+  ]
+}

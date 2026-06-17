@@ -1,0 +1,403 @@
+{
+  "name": "WF1 - Lead Discovery & AI Qualification",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "name": "Schedule - 9AM Weekdays",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-apollo-config",
+              "name": "apolloConfig",
+              "value": "={{ { page: 1, per_page: 25, person_titles: [\"CEO\", \"Founder\", \"Co-Founder\", \"CTO\", \"VP Sales\", \"Head of Marketing\", \"Director\"], person_locations: [\"Vietnam\", \"Ho Chi Minh City\", \"Hanoi\", \"Singapore\"], contact_email_status: [\"verified\", \"likely to engage\"], organization_num_employees_ranges: [\"1,50\", \"51,200\", \"201,500\"] } }}",
+              "type": "object"
+            },
+            {
+              "id": "assign-airtable-base",
+              "name": "airtableBaseId",
+              "value": "YOUR_AIRTABLE_BASE_ID",
+              "type": "string"
+            },
+            {
+              "id": "assign-airtable-table",
+              "name": "airtableTableName",
+              "value": "Leads",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-0002-0002-0002-000000000002",
+      "name": "Set Search Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apollo.io/v1/mixed_people/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Cache-Control",
+              "value": "no-cache"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.apolloConfig) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "APOLLO_CRED_ID",
+          "name": "Apollo API Key"
+        }
+      },
+      "id": "a1b2c3d4-0003-0003-0003-000000000003",
+      "name": "Apollo - Search People",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract leads from Apollo response\nconst response = $input.item.json;\n\nif (!response.people || response.people.length === 0) {\n  return [];\n}\n\nconst leads = response.people.map(person => ({\n  apollo_id: person.id || '',\n  name: `${person.first_name || ''} ${person.last_name || ''}`.trim(),\n  first_name: person.first_name || '',\n  last_name: person.last_name || '',\n  email: person.email || '',\n  title: person.title || '',\n  linkedin_url: person.linkedin_url || '',\n  city: person.city || '',\n  state: person.state || '',\n  country: person.country || 'Vietnam',\n  company: person.organization?.name || '',\n  industry: person.organization?.industry || '',\n  website: person.organization?.website_url || '',\n  employee_count: person.organization?.estimated_num_employees || 0,\n  phone: person.phone_numbers?.[0]?.sanitized_number || ''\n}));\n\n// Filter out leads without email\nconst validLeads = leads.filter(l => l.email && l.email.includes('@'));\n\nconsole.log(`Apollo returned ${response.people.length} people, ${validLeads.length} with valid email`);\n\nreturn validLeads.map(lead => ({ json: lead }));"
+      },
+      "id": "a1b2c3d4-0004-0004-0004-000000000004",
+      "name": "Extract Leads Array",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "a1b2c3d4-0005-0005-0005-000000000005",
+      "name": "Loop Over Each Lead",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "YOUR_AIRTABLE_BASE_ID",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "name"
+        },
+        "filterByFormula": "=OR({Email}='{{ $json.email }}', {Apollo_ID}='{{ $json.apollo_id }}')",
+        "options": {
+          "fields": ["Email", "Apollo_ID", "Status"]
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "AIRTABLE_CRED_ID",
+          "name": "Airtable Token"
+        }
+      },
+      "id": "a1b2c3d4-0006-0006-0006-000000000006",
+      "name": "Airtable - Check Duplicate",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pass current lead data to next node, also include search results\nconst lead = $('Loop Over Each Lead').item.json;\nconst searchResults = $input.all();\n\nreturn [{\n  json: {\n    ...lead,\n    isDuplicate: searchResults.length > 0 && searchResults[0].json.id !== undefined\n  }\n}];"
+      },
+      "id": "a1b2c3d4-0007-0007-0007-000000000007",
+      "name": "Merge Lead + Duplicate Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "check-duplicate",
+              "leftValue": "={{ $json.isDuplicate }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "a1b2c3d4-0008-0008-0008-000000000008",
+      "name": "Is New Lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1780, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare prompt for AI scoring\nconst lead = $json;\n\nconst scoringPrompt = `Bạn là chuyên gia B2B sales. Hãy chấm điểm mức độ phù hợp của lead này từ 1 đến 10 dựa trên tiêu chí ICP của chúng tôi.\n\nICP (Ideal Customer Profile) của chúng tôi:\n- Ngành: Technology, SaaS, E-commerce, Fintech, Startup\n- Quy mô: 10-500 nhân viên\n- Chức danh: CEO, Founder, Co-Founder, CTO, VP Sales, Head of Marketing, Director\n- Địa điểm: Việt Nam, Singapore, Đông Nam Á\n\nThông tin Lead:\n- Họ tên: ${lead.name}\n- Chức danh: ${lead.title}\n- Công ty: ${lead.company}\n- Ngành: ${lead.industry}\n- Quốc gia: ${lead.country}\n- Số nhân viên: ${lead.employee_count}\n- Email: ${lead.email}\n- LinkedIn: ${lead.linkedin_url}\n\nTrả về CHÍNH XÁC một JSON object theo format sau (không có text khác):\n{\n  \"score\": <số từ 1-10>,\n  \"reasoning\": \"<lý do ngắn gọn bằng tiếng Việt, tối đa 100 từ>\",\n  \"key_fit_factors\": [\"yếu tố 1\", \"yếu tố 2\"],\n  \"red_flags\": [\"flag 1\"] \n}`;\n\nreturn [{\n  json: {\n    ...lead,\n    scoringPrompt\n  }\n}];"
+      },
+      "id": "a1b2c3d4-0009-0009-0009-000000000009",
+      "name": "Prepare AI Scoring Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'system', content: 'You are a B2B sales qualification expert. Always respond with valid JSON only.' }, { role: 'user', content: $json.scoringPrompt }], response_format: { type: 'json_object' }, temperature: 0.3, max_tokens: 500 }) }}"
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "OPENAI_CRED_ID",
+          "name": "OpenAI API"
+        }
+      },
+      "id": "a1b2c3d4-0010-0010-0010-000000000010",
+      "name": "AI - Score Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2220, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI scoring response\nconst lead = $('Prepare AI Scoring Prompt').item.json;\nconst aiResponse = $input.item.json;\n\nlet scoreData = { score: 1, reasoning: 'Không thể chấm điểm', key_fit_factors: [], red_flags: [] };\n\ntry {\n  const content = aiResponse.choices?.[0]?.message?.content || '{}';\n  scoreData = JSON.parse(content);\n} catch (e) {\n  console.error('Failed to parse AI response:', e);\n}\n\nreturn [{\n  json: {\n    ...lead,\n    ai_score: scoreData.score || 1,\n    ai_reasoning: scoreData.reasoning || '',\n    ai_fit_factors: (scoreData.key_fit_factors || []).join(', '),\n    ai_red_flags: (scoreData.red_flags || []).join(', ')\n  }\n}];"
+      },
+      "id": "a1b2c3d4-0011-0011-0011-000000000011",
+      "name": "Parse AI Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2440, 220]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "score-check",
+              "leftValue": "={{ $json.ai_score }}",
+              "rightValue": 7,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "a1b2c3d4-0012-0012-0012-000000000012",
+      "name": "Score >= 7?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2660, 220]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "YOUR_AIRTABLE_BASE_ID",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $json.name }}",
+            "Email": "={{ $json.email }}",
+            "Company": "={{ $json.company }}",
+            "Title": "={{ $json.title }}",
+            "Industry": "={{ $json.industry }}",
+            "Website": "={{ $json.website }}",
+            "LinkedIn_URL": "={{ $json.linkedin_url }}",
+            "Apollo_ID": "={{ $json.apollo_id }}",
+            "Country": "={{ $json.country }}",
+            "AI_Score": "={{ $json.ai_score }}",
+            "AI_Score_Reasoning": "={{ $json.ai_reasoning }}",
+            "AI_Fit_Factors": "={{ $json.ai_fit_factors }}",
+            "Status": "Pending Review",
+            "Follow_up_Count": 0,
+            "Created_Date": "={{ new Date().toISOString().split('T')[0] }}"
+          }
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "AIRTABLE_CRED_ID",
+          "name": "Airtable Token"
+        }
+      },
+      "id": "a1b2c3d4-0013-0013-0013-000000000013",
+      "name": "Airtable - Save Qualified Lead",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [2880, 140]
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ '🎯 *Lead mới cần review!*\\n\\n👤 *' + $('Parse AI Score').item.json.name + '*\\n🏢 ' + $('Parse AI Score').item.json.company + '\\n💼 ' + $('Parse AI Score').item.json.title + '\\n🌍 ' + $('Parse AI Score').item.json.country + '\\n🏭 ' + $('Parse AI Score').item.json.industry + '\\n\\n⭐ *Điểm AI: ' + $('Parse AI Score').item.json.ai_score + '/10*\\n📝 ' + $('Parse AI Score').item.json.ai_reasoning + '\\n\\n🔗 ' + ($('Parse AI Score').item.json.linkedin_url || 'Không có LinkedIn') + '\\n\\n✅ Vào Airtable để *Approve* hoặc *Reject*' }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "TELEGRAM_CRED_ID",
+          "name": "Telegram Bot"
+        }
+      },
+      "id": "a1b2c3d4-0014-0014-0014-000000000014",
+      "name": "Telegram - New Lead Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [3100, 140]
+    },
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-0015-0015-0015-000000000015",
+      "name": "Skip - Low Score",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2880, 320]
+    },
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-0016-0016-0016-000000000016",
+      "name": "Skip - Duplicate",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2000, 400]
+    }
+  ],
+  "connections": {
+    "Schedule - 9AM Weekdays": {
+      "main": [[{"node": "Set Search Config", "type": "main", "index": 0}]]
+    },
+    "Set Search Config": {
+      "main": [[{"node": "Apollo - Search People", "type": "main", "index": 0}]]
+    },
+    "Apollo - Search People": {
+      "main": [[{"node": "Extract Leads Array", "type": "main", "index": 0}]]
+    },
+    "Extract Leads Array": {
+      "main": [[{"node": "Loop Over Each Lead", "type": "main", "index": 0}]]
+    },
+    "Loop Over Each Lead": {
+      "main": [[{"node": "Airtable - Check Duplicate", "type": "main", "index": 0}]]
+    },
+    "Airtable - Check Duplicate": {
+      "main": [[{"node": "Merge Lead + Duplicate Check", "type": "main", "index": 0}]]
+    },
+    "Merge Lead + Duplicate Check": {
+      "main": [[{"node": "Is New Lead?", "type": "main", "index": 0}]]
+    },
+    "Is New Lead?": {
+      "main": [
+        [{"node": "Prepare AI Scoring Prompt", "type": "main", "index": 0}],
+        [{"node": "Skip - Duplicate", "type": "main", "index": 0}]
+      ]
+    },
+    "Prepare AI Scoring Prompt": {
+      "main": [[{"node": "AI - Score Lead", "type": "main", "index": 0}]]
+    },
+    "AI - Score Lead": {
+      "main": [[{"node": "Parse AI Score", "type": "main", "index": 0}]]
+    },
+    "Parse AI Score": {
+      "main": [[{"node": "Score >= 7?", "type": "main", "index": 0}]]
+    },
+    "Score >= 7?": {
+      "main": [
+        [{"node": "Airtable - Save Qualified Lead", "type": "main", "index": 0}],
+        [{"node": "Skip - Low Score", "type": "main", "index": 0}]
+      ]
+    },
+    "Airtable - Save Qualified Lead": {
+      "main": [[{"node": "Telegram - New Lead Alert", "type": "main", "index": 0}]]
+    },
+    "Telegram - New Lead Alert": {
+      "main": [[{"node": "Loop Over Each Lead", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "wf1-lead-discovery-v1",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "n8n-lead-automation"
+  },
+  "pinData": {},
+  "tags": [
+    {"name": "Lead Generation", "createdAt": "2024-01-01T00:00:00.000Z"}
+  ]
+}

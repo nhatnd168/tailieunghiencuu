@@ -1,0 +1,331 @@
+{
+  "name": "WF3 - Follow-up Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 11 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "c3d4e5f6-0001-0001-0001-000000000001",
+      "name": "Schedule - 11AM Weekdays",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calculate the date threshold for follow-up\n// Follow-up 1: 3 days after last email\n// Follow-up 2: 5 days after follow-up 1\n// Follow-up 3: 7 days after follow-up 2\nconst followUpIntervals = [3, 5, 7];\nconst today = new Date();\n\n// Build Airtable filter formula\n// Get leads where:\n// 1. Status is 'Email Sent' or 'Follow-up X Sent'\n// 2. Last email was enough days ago\n// 3. Follow-up count < 3\n\nconst cutoffDate = new Date(today);\ncutoffDate.setDate(cutoffDate.getDate() - 3); // minimum 3 days\nconst cutoffDateStr = cutoffDate.toISOString().split('T')[0];\n\nconst filterFormula = `AND(\n  OR(\n    {Status}='Email Sent',\n    {Status}='Follow-up 1 Sent',\n    {Status}='Follow-up 2 Sent'\n  ),\n  {Follow_up_Count} < 3,\n  IS_BEFORE({Last_Email_Date}, '${cutoffDateStr}')\n)`;\n\nconsole.log('Follow-up filter:', filterFormula);\nconsole.log('Cutoff date:', cutoffDateStr);\n\nreturn [{ json: { filterFormula, today: today.toISOString().split('T')[0], cutoffDate: cutoffDateStr } }];"
+      },
+      "id": "c3d4e5f6-0002-0002-0002-000000000002",
+      "name": "Calculate Follow-up Dates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "YOUR_AIRTABLE_BASE_ID",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "name"
+        },
+        "filterByFormula": "={{ $json.filterFormula }}",
+        "returnAll": true,
+        "options": {
+          "sort": [{"field": "Last_Email_Date", "direction": "asc"}]
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "AIRTABLE_CRED_ID",
+          "name": "Airtable Token"
+        }
+      },
+      "id": "c3d4e5f6-0003-0003-0003-000000000003",
+      "name": "Airtable - Get Follow-up Queue",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-followup-leads",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "c3d4e5f6-0004-0004-0004-000000000004",
+      "name": "Has Leads to Follow-up?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "c3d4e5f6-0005-0005-0005-000000000005",
+      "name": "Loop Follow-up Leads",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1120, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check exact follow-up timing based on interval rules\nconst record = $input.item.json;\nconst fields = record.fields || record;\n\nconst today = new Date();\nconst lastEmailDate = new Date(fields.Last_Email_Date);\nconst daysSinceLastEmail = Math.floor((today - lastEmailDate) / (1000 * 60 * 60 * 24));\nconst followUpCount = parseInt(fields.Follow_up_Count) || 0;\n\n// Follow-up intervals: [3, 5, 7] days\nconst intervals = [3, 5, 7];\nconst requiredInterval = intervals[followUpCount] || 7;\n\nconst shouldSendFollowUp = daysSinceLastEmail >= requiredInterval;\n\nconsole.log(`Lead: ${fields.Name}, Days since last: ${daysSinceLastEmail}, Required: ${requiredInterval}, Should send: ${shouldSendFollowUp}`);\n\n// YOUR COMPANY INFO - Update these!\nconst myCompany = 'XCONS';\nconst myProduct = 'giải pháp tư vấn và triển khai công nghệ';\nconst myName = 'Nhật';\n\nconst followUpNumber = followUpCount + 1;\nconst name = fields.Name || '';\nconst firstName = name.split(' ')[0] || name;\n\nconst followUpPrompt = `Hãy viết email follow-up lần ${followUpNumber} cho chiến dịch cold email B2B, bằng tiếng Việt.\n\nThông tin người nhận:\n- Họ tên: ${name}\n- Chức danh: ${fields.Title || ''}\n- Công ty: ${fields.Company || ''}\n- Ngành: ${fields.Industry || ''}\n- Gọi bằng: ${firstName}\n\nLịch sử gửi:\n- Email đầu tiên gửi ngày: ${fields.Email_Sent_Date || ''}\n- Số ngày đã qua: ${daysSinceLastEmail} ngày\n- Đây là follow-up lần thứ: ${followUpNumber}\n- Tiêu đề email gốc: ${fields.Email_Subject || ''}\n- Chưa có phản hồi từ họ\n\nThông tin người gửi:\n- Công ty: ${myCompany}\n- Sản phẩm/Dịch vụ: ${myProduct}\n- Tên: ${myName}\n\nYêu cầu:\n1. Ngắn hơn email gốc (80-120 từ)\n2. Không lặp lại nội dung cũ\n3. Thêm góc nhìn/insight mới hoặc social proof\n4. Call to action đơn giản hơn (chỉ cần 1 từ \"Có\" hay \"Không\")\n5. Giọng văn nhẹ nhàng, không tạo áp lực\n${followUpNumber === 3 ? '6. ĐÂY LÀ EMAIL CUỐI CÙNG - Nêu rõ đây là lần cuối bạn liên hệ' : ''}\n\nTrả về CHÍNH XÁC JSON sau (không có text khác):\n{\n  \"subject\": \"Re: ${fields.Email_Subject || 'Hợp tác với ' + fields.Company}\",\n  \"body\": \"<nội dung email, dùng \\\\n để xuống dòng>\"\n}`;\n\nreturn [{\n  json: {\n    record_id: record.id,\n    name,\n    first_name: firstName,\n    email: fields.Email,\n    company: fields.Company || '',\n    title: fields.Title || '',\n    industry: fields.Industry || '',\n    original_subject: fields.Email_Subject || '',\n    thread_id: fields.Email_Thread_ID || '',\n    follow_up_count: followUpCount,\n    follow_up_number: followUpNumber,\n    days_since_last_email: daysSinceLastEmail,\n    should_send: shouldSendFollowUp,\n    followUpPrompt\n  }\n}];"
+      },
+      "id": "c3d4e5f6-0006-0006-0006-000000000006",
+      "name": "Check Timing & Prepare Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 220]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "should-send",
+              "leftValue": "={{ $json.should_send }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "c3d4e5f6-0007-0007-0007-000000000007",
+      "name": "Ready to Send Follow-up?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1560, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'system', content: 'Bạn là chuyên gia viết follow-up email B2B tiếng Việt. Luôn trả về JSON hợp lệ.' }, { role: 'user', content: $json.followUpPrompt }], response_format: { type: 'json_object' }, temperature: 0.7, max_tokens: 600 }) }}"
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "OPENAI_CRED_ID",
+          "name": "OpenAI API"
+        }
+      },
+      "id": "c3d4e5f6-0008-0008-0008-000000000008",
+      "name": "AI - Write Follow-up Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 140]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse follow-up email content\nconst leadData = $('Check Timing & Prepare Prompt').item.json;\nconst aiResponse = $input.item.json;\n\nlet emailContent = { \n  subject: `Re: ${leadData.original_subject}`, \n  body: `Xin chào ${leadData.first_name},\\n\\nTôi muốn follow up email trước...` \n};\n\ntry {\n  const content = aiResponse.choices?.[0]?.message?.content || '{}';\n  emailContent = JSON.parse(content);\n} catch (e) {\n  console.error('Failed to parse follow-up email:', e);\n}\n\nconst htmlBody = emailContent.body\n  .replace(/\\n/g, '<br>')\n  .replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>');\n\nreturn [{\n  json: {\n    ...leadData,\n    subject: emailContent.subject,\n    body_plain: emailContent.body,\n    body_html: `<div style=\"font-family: Arial, sans-serif; max-width: 600px; line-height: 1.6;\">${htmlBody}</div>`\n  }\n}];"
+      },
+      "id": "c3d4e5f6-0009-0009-0009-000000000009",
+      "name": "Parse Follow-up Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 140]
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "to": "={{ $json.email }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.body_html }}",
+        "options": {
+          "threadId": "={{ $json.thread_id }}"
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "GMAIL_CRED_ID",
+          "name": "Gmail Account"
+        }
+      },
+      "id": "c3d4e5f6-0010-0010-0010-000000000010",
+      "name": "Gmail - Send Follow-up (Thread)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [2220, 140]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare Airtable update data\nconst leadData = $('Parse Follow-up Content').item.json;\nconst newFollowUpCount = leadData.follow_up_count + 1;\nconst today = new Date().toISOString().split('T')[0];\n\n// Determine new status\nlet newStatus;\nif (newFollowUpCount >= 3) {\n  newStatus = 'Follow-up 3 Sent';\n} else if (newFollowUpCount === 2) {\n  newStatus = 'Follow-up 2 Sent';\n} else {\n  newStatus = 'Follow-up 1 Sent';\n}\n\nreturn [{\n  json: {\n    record_id: leadData.record_id,\n    name: leadData.name,\n    company: leadData.company,\n    new_follow_up_count: newFollowUpCount,\n    new_status: newStatus,\n    today\n  }\n}];"
+      },
+      "id": "c3d4e5f6-0011-0011-0011-000000000011",
+      "name": "Prepare Update Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2440, 140]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "YOUR_AIRTABLE_BASE_ID",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "name"
+        },
+        "id": "={{ $json.record_id }}",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "={{ $json.new_status }}",
+            "Follow_up_Count": "={{ $json.new_follow_up_count }}",
+            "Last_Email_Date": "={{ $json.today }}"
+          }
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "AIRTABLE_CRED_ID",
+          "name": "Airtable Token"
+        }
+      },
+      "id": "c3d4e5f6-0012-0012-0012-000000000012",
+      "name": "Airtable - Update Follow-up",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [2660, 140]
+    },
+    {
+      "parameters": {
+        "amount": 45,
+        "unit": "seconds"
+      },
+      "id": "c3d4e5f6-0013-0013-0013-000000000013",
+      "name": "Wait 45s (Anti-Spam)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [2880, 140],
+      "webhookId": "wait-antispam-wf3"
+    },
+    {
+      "parameters": {},
+      "id": "c3d4e5f6-0014-0014-0014-000000000014",
+      "name": "Skip - Not Time Yet",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1780, 320]
+    },
+    {
+      "parameters": {},
+      "id": "c3d4e5f6-0015-0015-0015-000000000015",
+      "name": "No Follow-up Needed",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1120, 420]
+    }
+  ],
+  "connections": {
+    "Schedule - 11AM Weekdays": {
+      "main": [[{"node": "Calculate Follow-up Dates", "type": "main", "index": 0}]]
+    },
+    "Calculate Follow-up Dates": {
+      "main": [[{"node": "Airtable - Get Follow-up Queue", "type": "main", "index": 0}]]
+    },
+    "Airtable - Get Follow-up Queue": {
+      "main": [[{"node": "Has Leads to Follow-up?", "type": "main", "index": 0}]]
+    },
+    "Has Leads to Follow-up?": {
+      "main": [
+        [{"node": "Loop Follow-up Leads", "type": "main", "index": 0}],
+        [{"node": "No Follow-up Needed", "type": "main", "index": 0}]
+      ]
+    },
+    "Loop Follow-up Leads": {
+      "main": [[{"node": "Check Timing & Prepare Prompt", "type": "main", "index": 0}]]
+    },
+    "Check Timing & Prepare Prompt": {
+      "main": [[{"node": "Ready to Send Follow-up?", "type": "main", "index": 0}]]
+    },
+    "Ready to Send Follow-up?": {
+      "main": [
+        [{"node": "AI - Write Follow-up Email", "type": "main", "index": 0}],
+        [{"node": "Skip - Not Time Yet", "type": "main", "index": 0}]
+      ]
+    },
+    "AI - Write Follow-up Email": {
+      "main": [[{"node": "Parse Follow-up Content", "type": "main", "index": 0}]]
+    },
+    "Parse Follow-up Content": {
+      "main": [[{"node": "Gmail - Send Follow-up (Thread)", "type": "main", "index": 0}]]
+    },
+    "Gmail - Send Follow-up (Thread)": {
+      "main": [[{"node": "Prepare Update Data", "type": "main", "index": 0}]]
+    },
+    "Prepare Update Data": {
+      "main": [[{"node": "Airtable - Update Follow-up", "type": "main", "index": 0}]]
+    },
+    "Airtable - Update Follow-up": {
+      "main": [[{"node": "Wait 45s (Anti-Spam)", "type": "main", "index": 0}]]
+    },
+    "Wait 45s (Anti-Spam)": {
+      "main": [[{"node": "Loop Follow-up Leads", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "versionId": "wf3-followup-v1",
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "n8n-lead-automation"
+  },
+  "pinData": {},
+  "tags": [
+    {"name": "Follow-up", "createdAt": "2024-01-01T00:00:00.000Z"}
+  ]
+}
