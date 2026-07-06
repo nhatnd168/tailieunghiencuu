@@ -1,0 +1,21 @@
+{
+  "_huong_dan": "Copy file nay thanh data/actuals_2026.json va dien so thuc te theo tung thang da co. Bo qua thang chua co so lieu (khong can dien null). Cau truc departments/metric phai khop voi data/kpi_plan_2026.json.",
+  "as_of_month": 6,
+  "departments": {
+    "thiet_ke": {
+      "tong_doanh_thu": {"T1": 195000000, "T2": 610000000, "T3": 350000000, "T4": 700000000, "T5": 640000000, "T6": 580000000}
+    },
+    "kinh_doanh": {
+      "san_luong_ky_thiet_ke": {"T1": 400000000, "T2": 350000000, "T3": 760000000, "T4": 700000000, "T5": 710000000, "T6": 820000000},
+      "san_luong_ky_thi_cong_tho": {"T1": 1600000000, "T2": 1700000000, "T3": 4800000000, "T4": 5300000000, "T5": 4800000000, "T6": 4700000000}
+    },
+    "thi_cong": {
+      "san_luong_tc_hoan_thien": {"T3": 1700000000, "T4": 1650000000, "T5": 2250000000, "T6": 2800000000},
+      "doanh_thu_tc_hoan_thien": {"T3": 1150000000, "T4": 1180000000, "T5": 1580000000, "T6": 1950000000}
+    },
+    "thi_cong_noi_that": {
+      "san_luong_ky_tc_noi_that": {"T2": 1200000000, "T3": 950000000, "T4": 1050000000, "T5": 1300000000, "T6": 1100000000},
+      "doanh_thu_tc_noi_that": {"T1": 1300000000, "T2": 1100000000, "T3": 900000000, "T4": 950000000, "T5": 1150000000, "T6": 1000000000}
+    }
+  }
+}
