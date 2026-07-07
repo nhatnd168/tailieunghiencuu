@@ -1,0 +1,783 @@
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{
+    --red:#c0392b; --red-dark:#96281d; --green:#1e8e5a; --amber:#b7791f;
+    --ink:#1c2430; --ink-soft:#5b6472; --line:#e4e7ec; --line-soft:#eef0f3;
+    --bg:#f4f5f7; --card:#ffffff; --chip:#f0f1f4;
+    --radius:10px; --shadow:0 1px 2px rgba(20,20,30,.06), 0 1px 12px rgba(20,20,30,.04);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;}
+  a{color:inherit;}
+  #topbar{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line);padding:10px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+  #topbar h1{font-size:16px;margin:0;white-space:nowrap;}
+  #topbar .sub{font-size:12px;color:var(--ink-soft);}
+  #topbar .grow{flex:1 1 auto;}
+  #globalSearch{width:100%;max-width:340px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;}
+  #globalSearchResults{position:absolute;margin-top:4px;background:var(--card);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);max-width:340px;max-height:320px;overflow:auto;display:none;z-index:30;}
+  #globalSearchResults .gr-item{padding:8px 10px;border-bottom:1px solid var(--line-soft);cursor:pointer;font-size:12.5px;}
+  #globalSearchResults .gr-item:hover{background:var(--chip);}
+  #globalSearchResults .gr-item b{color:var(--red);}
+  .btn{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;color:var(--ink);}
+  .btn:hover{background:var(--chip);}
+  .btn.primary{background:var(--red);border-color:var(--red);color:#fff;}
+  .btn.primary:hover{background:var(--red-dark);}
+  #tabs{display:flex;gap:4px;padding:8px 16px 0;overflow-x:auto;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:53px;z-index:19;}
+  #tabs button{border:none;background:transparent;padding:9px 14px;font-size:13px;cursor:pointer;color:var(--ink-soft);border-bottom:2px solid transparent;white-space:nowrap;}
+  #tabs button.active{color:var(--red);border-bottom-color:var(--red);font-weight:600;}
+  #tabs button:hover{color:var(--ink);}
+  main{padding:18px;max-width:1400px;margin:0 auto;}
+  .view{display:none;}
+  .view.active{display:block;}
+  .subtabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
+  .subtabs button{border:1px solid var(--line);background:var(--card);padding:6px 12px;border-radius:999px;font-size:12.5px;cursor:pointer;}
+  .subtabs button.active{background:var(--red);color:#fff;border-color:var(--red);}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px;}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);}
+  .kpi .label{font-size:12px;color:var(--ink-soft);margin-bottom:6px;}
+  .kpi .value{font-size:19px;font-weight:700;letter-spacing:-.2px;}
+  .kpi .sub{font-size:11.5px;color:var(--ink-soft);margin-top:4px;}
+  .kpi .value.neg{color:var(--red);}
+  .kpi .value.pos{color:var(--green);}
+  .charts-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px;margin-bottom:16px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);}
+  .card h3{margin:0 0 10px;font-size:13.5px;font-weight:600;}
+  .card h3 .hint{font-weight:400;color:var(--ink-soft);font-size:11.5px;}
+  .chart-wrap{position:relative;height:260px;}
+  .table-toolbar{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;}
+  .table-toolbar input[type=search]{padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;min-width:200px;flex:1;max-width:320px;}
+  .table-toolbar .count{font-size:12px;color:var(--ink-soft);margin-left:auto;}
+  .table-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--card);}
+  table.dt{border-collapse:collapse;width:100%;font-size:12.8px;}
+  table.dt thead th{position:sticky;top:0;background:#fafbfc;border-bottom:1px solid var(--line);padding:9px 10px;text-align:left;white-space:nowrap;cursor:pointer;user-select:none;color:var(--ink-soft);font-weight:600;}
+  table.dt thead th:hover{color:var(--ink);}
+  table.dt thead th.num,table.dt td.num{text-align:right;}
+  table.dt thead th .arrow{opacity:.5;margin-left:3px;}
+  table.dt tbody td{padding:7px 10px;border-bottom:1px solid var(--line-soft);white-space:nowrap;}
+  table.dt tbody tr:hover{background:#fafbfc;}
+  table.dt td.neg{color:var(--red);}
+  table.dt td.name-cell{white-space:normal;min-width:220px;}
+  table.dt tr.lvl0 td{font-weight:700;background:#faf8f6;}
+  table.dt tr.lvl1 td.name-cell{font-weight:600;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;}
+  .badge.warn{background:#fdf0dc;color:var(--amber);}
+  .badge.bad{background:#fbe4e1;color:var(--red);}
+  .badge.info{background:#e4eefb;color:#2563a8;}
+  .badge.neutral{background:var(--chip);color:var(--ink-soft);}
+  .pagination{display:flex;align-items:center;gap:10px;justify-content:flex-end;margin-top:10px;font-size:12.5px;color:var(--ink-soft);}
+  .pagination button{border:1px solid var(--line);background:var(--card);border-radius:6px;padding:4px 9px;cursor:pointer;}
+  .pagination button:disabled{opacity:.4;cursor:default;}
+  .section-title{font-size:14px;font-weight:700;margin:22px 0 10px;}
+  .section-title:first-child{margin-top:0;}
+  #loading{position:fixed;inset:0;background:rgba(244,245,247,.9);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;z-index:100;}
+  .spinner{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--red);border-radius:50%;animation:spin 0.8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  #errorBanner{display:none;background:#fbe4e1;color:var(--red-dark);padding:10px 20px;font-size:13px;}
+  .muted{color:var(--ink-soft);}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media (max-width:760px){.grid2{grid-template-columns:1fr;}}
+  .dept-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
+  .dept-chips button{border:1px solid var(--line);background:var(--card);padding:5px 11px;border-radius:999px;font-size:12px;cursor:pointer;}
+  .dept-chips button.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+</style>
+
+<div id="loading"><div class="spinner"></div><div class="muted">Đang tải dữ liệu từ Google Sheets…</div></div>
+<div id="errorBanner"></div>
+
+<div id="topbar">
+  <h1>📊 Xcons Group — Dashboard KQKD</h1>
+  <div class="sub" id="metaLine"></div>
+  <div class="grow"></div>
+  <div style="position:relative;">
+    <input id="globalSearch" type="search" placeholder="Tìm dự án, khoản mục phí, chỉ tiêu…" autocomplete="off"/>
+    <div id="globalSearchResults"></div>
+  </div>
+  <button class="btn" id="clearFiltersBtn">Xóa bộ lọc</button>
+  <button class="btn primary" id="refreshBtn">↻ Làm mới</button>
+</div>
+
+<nav id="tabs"></nav>
+<main id="views"></main>
+
+<script>
+// =========================================================================
+// Utilities
+// =========================================================================
+function fmtNum(n){ return Math.round(n||0).toLocaleString('vi-VN'); }
+function fmtVND(n){ return fmtNum(n) + ' ₫'; }
+function fmtPct(n){ return (n==null) ? '—' : (n*100).toLocaleString('vi-VN',{maximumFractionDigits:1}) + '%'; }
+function fmtPctRatio(part, whole){ return whole ? ((part/whole)*100).toLocaleString('vi-VN',{maximumFractionDigits:1})+'%' : '—'; }
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function normalize(s){ return String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase(); }
+function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+function signClass(n){ return n < 0 ? 'neg' : (n > 0 ? 'pos' : ''); }
+const MONTHS12 = Array.from({length:12}, (_,i)=>'Th'+(i+1));
+
+let DATA = null;
+const charts = {}; // canvasId -> Chart instance
+
+function upsertChart(canvasId, config){
+  const el = document.getElementById(canvasId);
+  if (!el) return;
+  if (charts[canvasId]) charts[canvasId].destroy();
+  charts[canvasId] = new Chart(el.getContext('2d'), config);
+}
+
+const COLOR_PLAN = '#94a3b8';
+const COLOR_ACTUAL = '#c0392b';
+const COLOR_GOOD = '#1e8e5a';
+const PALETTE = ['#c0392b','#2563a8','#b7791f','#1e8e5a','#6d5bd0','#0e7490','#9d174d','#4d7c0f'];
+
+function baseChartOpts(extra){
+  return Object.assign({
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ position:'bottom', labels:{ boxWidth:12, font:{size:11} } },
+      tooltip:{ callbacks:{ label: (ctx)=> `${ctx.dataset.label}: ${fmtVND(ctx.parsed.y ?? ctx.parsed)}` } } },
+    scales:{ y:{ ticks:{ callback:(v)=>fmtNum(v) } }, x:{} }
+  }, extra || {});
+}
+
+// =========================================================================
+// Reusable data-table component
+// =========================================================================
+function createTable(mount, opts){
+  const state = { query:'', sortKey: opts.sortKey || null, sortDir: opts.sortDir || -1, page: 1, pageSize: opts.pageSize || 50 };
+  let rows = opts.rows || [];
+
+  function cellValue(col, row){ return col.value ? col.value(row) : row[col.key]; }
+
+  function filtered(){
+    if (!state.query) return rows;
+    const q = normalize(state.query);
+    const keys = opts.searchKeys || opts.columns.map(c=>c.key);
+    return rows.filter(r => keys.some(k => normalize(r[k]).includes(q)));
+  }
+
+  function sorted(list){
+    if (!state.sortKey) return list;
+    const col = opts.columns.find(c=>c.key===state.sortKey);
+    const numeric = col && col.numeric;
+    return list.slice().sort((a,b)=>{
+      let av = cellValue(col,a), bv = cellValue(col,b);
+      if (numeric){ av = av||0; bv = bv||0; return (av-bv)*state.sortDir; }
+      av = normalize(av); bv = normalize(bv);
+      return av < bv ? -state.sortDir : (av > bv ? state.sortDir : 0);
+    });
+  }
+
+  function render(){
+    const all = sorted(filtered());
+    const totalPages = Math.max(1, Math.ceil(all.length / state.pageSize));
+    state.page = Math.min(state.page, totalPages);
+    const pageRows = opts.paginate === false ? all : all.slice((state.page-1)*state.pageSize, state.page*state.pageSize);
+
+    const toolbar = opts.searchable === false ? '' : `
+      <div class="table-toolbar">
+        <input type="search" placeholder="${opts.searchPlaceholder || 'Tìm kiếm…'}" value="${escapeHtml(state.query)}"/>
+        <span class="count">${all.length.toLocaleString('vi-VN')} dòng${opts.extraCount ? ' · ' + opts.extraCount(all) : ''}</span>
+      </div>`;
+
+    const thead = `<thead><tr>${opts.columns.map(c=>{
+      const arrow = state.sortKey===c.key ? `<span class="arrow">${state.sortDir===1?'▲':'▼'}</span>` : '';
+      return `<th class="${c.numeric?'num':''}" data-key="${c.key}">${c.label}${c.sortable===false?'':arrow}</th>`;
+    }).join('')}</tr></thead>`;
+
+    const tbody = `<tbody>${pageRows.map(r=>{
+      const cls = opts.rowClass ? opts.rowClass(r) : '';
+      return `<tr class="${cls}">${opts.columns.map(c=>{
+        const raw = cellValue(c, r);
+        const val = c.render ? c.render(r) : (c.numeric ? fmtVND(raw) : escapeHtml(raw));
+        const negCls = c.numeric && (raw||0) < 0 ? 'neg' : '';
+        return `<td class="${c.numeric?'num':''} ${negCls} ${c.nameCell?'name-cell':''}">${val}</td>`;
+      }).join('')}</tr>`;
+    }).join('') || `<tr><td colspan="${opts.columns.length}" class="muted" style="text-align:center;padding:20px;">Không có dữ liệu phù hợp</td></tr>`}</tbody>`;
+
+    const pagination = (opts.paginate === false || all.length <= state.pageSize) ? '' : `
+      <div class="pagination">
+        <span>Trang ${state.page}/${totalPages}</span>
+        <button data-act="prev" ${state.page<=1?'disabled':''}>‹ Trước</button>
+        <button data-act="next" ${state.page>=totalPages?'disabled':''}>Sau ›</button>
+      </div>`;
+
+    mount.innerHTML = `${toolbar}<div class="table-scroll"><table class="dt">${thead}${tbody}</table></div>${pagination}`;
+
+    if (opts.searchable !== false){
+      mount.querySelector('input[type=search]').addEventListener('input', debounce(e=>{
+        state.query = e.target.value; state.page = 1; render();
+      }, 180));
+    }
+    mount.querySelectorAll('thead th[data-key]').forEach(th=>{
+      const col = opts.columns.find(c=>c.key===th.dataset.key);
+      if (col && col.sortable===false) return;
+      th.addEventListener('click', ()=>{
+        if (state.sortKey === th.dataset.key) state.sortDir *= -1;
+        else { state.sortKey = th.dataset.key; state.sortDir = col && col.numeric ? -1 : 1; }
+        render();
+      });
+    });
+    const prev = mount.querySelector('[data-act=prev]'), next = mount.querySelector('[data-act=next]');
+    if (prev) prev.addEventListener('click', ()=>{ state.page--; render(); });
+    if (next) next.addEventListener('click', ()=>{ state.page++; render(); });
+  }
+
+  render();
+  return { setRows(r){ rows = r; state.page = 1; render(); }, reset(){ state.query=''; state.page=1; render(); } };
+}
+
+function kpiCard(label, value, sub, cls){
+  return `<div class="kpi"><div class="label">${label}</div><div class="value ${cls||''}">${value}</div>${sub?`<div class="sub">${sub}</div>`:''}</div>`;
+}
+
+// =========================================================================
+// Tabs
+// =========================================================================
+const TABS = [];
+function registerTab(id, label, buildFn){ TABS.push({id, label, buildFn}); }
+
+function initTabs(){
+  const nav = document.getElementById('tabs');
+  const views = document.getElementById('views');
+  TABS.forEach((t, i)=>{
+    const btn = document.createElement('button');
+    btn.textContent = t.label; btn.dataset.tab = t.id;
+    if (i===0) btn.classList.add('active');
+    btn.addEventListener('click', ()=> activateTab(t.id));
+    nav.appendChild(btn);
+
+    const view = document.createElement('section');
+    view.className = 'view' + (i===0 ? ' active' : '');
+    view.id = 'view-' + t.id;
+    views.appendChild(view);
+  });
+}
+function activateTab(id){
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===id));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id === 'view-'+id));
+  window.scrollTo({top:0});
+}
+
+// =========================================================================
+// Data-model helpers
+// =========================================================================
+function getSection(report, code){ return report && report.sections.find(s=>s.code===code); }
+function getItem(section, tt){ return section && section.rows.find(r => r.tt===tt); }
+function sumRows(rows){ return rows.reduce((a,r)=>a+(r.tong||r.total||0), 0); }
+
+// =========================================================================
+// TAB: Tổng quan
+// =========================================================================
+registerTab('overview', 'Tổng quan', function(root){
+  const pnl = DATA.pnl;
+  const kh = getSection(pnl, 'A'), th = getSection(pnl, 'B');
+  const dtKH = getItem(kh, 1), dtTH = getItem(th, 1);
+  const cpKH = getItem(kh, 4), cpTH = getItem(th, 4);
+  const lnKH = getItem(kh, 10), lnTH = getItem(th, 10);
+
+  const kmpTotal = DATA.kmp && DATA.kmp.grandTotal;
+  const backlogTK = DATA.hopDongTonTK.reduce((a,x)=>a+x.conPhaiThu,0);
+  const backlogTC = DATA.hopDongTonTC.reduce((a,x)=>a+x.conPhaiThu,0);
+
+  root.innerHTML = `
+    <div class="kpis">
+      ${kpiCard('Doanh thu thuần — Kế hoạch năm', fmtVND(dtKH?dtKH.total:0))}
+      ${kpiCard('Doanh thu thuần — Thực hiện', fmtVND(dtTH?dtTH.total:0), 'Hoàn thành ' + fmtPctRatio(dtTH?dtTH.total:0, dtKH?dtKH.total:0) + ' kế hoạch năm')}
+      ${kpiCard('Chi phí — Kế hoạch / Thực hiện', fmtVND(cpTH?cpTH.total:0), 'Kế hoạch: ' + fmtVND(cpKH?cpKH.total:0))}
+      ${kpiCard('Tổng lợi nhuận — Thực hiện', fmtVND(lnTH?lnTH.total:0), 'Kế hoạch: ' + fmtVND(lnKH?lnKH.total:0), signClass(lnTH?lnTH.total:0))}
+      ${kpiCard('Giá trị hợp đồng tồn — còn phải thu', fmtVND(backlogTK+backlogTC), `Thiết kế ${fmtVND(backlogTK)} · Thi công ${fmtVND(backlogTC)}`)}
+      ${kpiCard('Chi phí quản lý/bán hàng (KMP) — Thực hiện Q1', kmpTotal?fmtVND(kmpTotal.q1):'—', kmpTotal?('Kế hoạch quý: '+fmtVND(kmpTotal.keHoach)):'')}
+    </div>
+    <div class="charts-row">
+      <div class="card"><h3>Doanh thu thuần theo quý <span class="hint">Kế hoạch vs Thực hiện</span></h3><div class="chart-wrap"><canvas id="chOvRevenue"></canvas></div></div>
+      <div class="card"><h3>Tổng lợi nhuận theo quý <span class="hint">Kế hoạch vs Thực hiện</span></h3><div class="chart-wrap"><canvas id="chOvProfit"></canvas></div></div>
+    </div>
+    <div class="charts-row">
+      <div class="card"><h3>Cơ cấu chi phí kế hoạch <span class="hint">theo nhóm KMP</span></h3><div class="chart-wrap"><canvas id="chOvCostMix"></canvas></div></div>
+      <div class="card"><h3>Tiến độ ghi nhận doanh thu hợp đồng tồn <span class="hint">theo tháng, kế hoạch</span></h3><div class="chart-wrap"><canvas id="chOvBacklog"></canvas></div></div>
+    </div>
+  `;
+
+  upsertChart('chOvRevenue', { type:'bar', data:{ labels: pnl.valueLabels, datasets:[
+    { label:'Kế hoạch', data: dtKH?dtKH.values:[0,0,0,0], backgroundColor: COLOR_PLAN },
+    { label:'Thực hiện', data: dtTH?dtTH.values:[0,0,0,0], backgroundColor: COLOR_ACTUAL } ]},
+    options: baseChartOpts() });
+
+  upsertChart('chOvProfit', { type:'bar', data:{ labels: pnl.valueLabels, datasets:[
+    { label:'Kế hoạch', data: lnKH?lnKH.values:[0,0,0,0], backgroundColor: COLOR_PLAN },
+    { label:'Thực hiện', data: lnTH?lnTH.values:[0,0,0,0], backgroundColor: COLOR_GOOD } ]},
+    options: baseChartOpts() });
+
+  const groupRows = (DATA.kmp ? DATA.kmp.rows.filter(r=>r.level===0) : []);
+  upsertChart('chOvCostMix', { type:'doughnut', data:{ labels: groupRows.map(r=>r.tenPhi), datasets:[
+    { data: groupRows.map(r=>r.keHoach), backgroundColor: PALETTE } ]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'right', labels:{boxWidth:10,font:{size:10.5}}},
+      tooltip:{ callbacks:{ label:(ctx)=> `${ctx.label}: ${fmtVND(ctx.parsed)}` } } } } });
+
+  const th12 = DATA.hopDongTonTongHop;
+  const khSection = th12 && th12.sections[0], thSection2 = th12 && th12.sections[1];
+  upsertChart('chOvBacklog', { type:'bar', data:{ labels: th12?th12.monthLabels:MONTHS12, datasets:[
+    { label:'Kế hoạch', data: khSection&&khSection.total ? khSection.total.months : [], backgroundColor: COLOR_PLAN },
+    { label:'Thực hiện', data: thSection2&&thSection2.total ? thSection2.total.months : [], backgroundColor: COLOR_ACTUAL } ]},
+    options: baseChartOpts() });
+});
+
+// =========================================================================
+// TAB: KQKD (P&L) + Sản lượng & Lương  (shared renderer — identical shape)
+// =========================================================================
+function renderQuarterlyReport(root, report, opts){
+  opts = opts || {};
+  if (!report){ root.innerHTML = '<p class="muted">Không có dữ liệu.</p>'; return; }
+  let activeCode = report.sections[0].code;
+  // root.id is unique per tab (view-pnl / view-sl-luong); scope element ids
+  // to it so this shared renderer never collides across the two callers.
+  const canvasId = root.id + '-chQR';
+  const mountId = root.id + '-qrTableMount';
+
+  function draw(){
+    const section = getSection(report, activeCode);
+    const highlightTTs = opts.highlightTTs || [];
+    const highlighted = section.rows.filter(r => highlightTTs.includes(r.tt));
+
+    root.innerHTML = `
+      <div class="subtabs">${report.sections.map(s=>`<button data-code="${s.code}" class="${s.code===activeCode?'active':''}">${s.title}</button>`).join('')}</div>
+      <div class="charts-row"><div class="card" style="grid-column:1/-1;"><h3>${section.title} — chỉ tiêu chính theo quý</h3><div class="chart-wrap"><canvas id="${canvasId}"></canvas></div></div></div>
+      <div class="table-scroll" id="${mountId}"></div>
+    `;
+    root.querySelectorAll('.subtabs button').forEach(b=> b.addEventListener('click', ()=>{ activeCode = b.dataset.code; draw(); }));
+
+    upsertChart(canvasId, { type:'bar', data:{ labels: report.valueLabels, datasets: highlighted.map((r,i)=>({
+      label: r.name, data: r.values, backgroundColor: PALETTE[i % PALETTE.length] })) },
+      options: baseChartOpts() });
+
+    const mount = document.getElementById(mountId);
+    createTable(mount, {
+      rows: section.rows,
+      searchable: true, paginate: true, pageSize: 100,
+      searchPlaceholder: 'Tìm chỉ tiêu…',
+      searchKeys: ['name'],
+      rowClass: r => 'lvl' + r.indent,
+      columns: [
+        { key:'tt', label:'TT', numeric:false, render: r => escapeHtml(r.tt==null?'':r.tt) },
+        { key:'name', label: report.nameLabel || 'Chỉ tiêu', nameCell:true, render: r => `<span style="padding-left:${r.indent*16}px;display:inline-block;">${escapeHtml(r.name)}</span>` },
+        ...report.valueLabels.map((lbl,i)=>({ key:'v'+i, label: lbl, numeric:true, value: r => r.values[i], render: r => fmtVND(r.values[i]) })),
+        { key:'total', label: report.totalLabel, numeric:true },
+        { key:'ratio', label:'Tỷ lệ/DT', numeric:false, render: r => fmtPct(r.ratio), sortable:false }
+      ]
+    });
+  }
+  draw();
+}
+
+registerTab('pnl', 'KQKD (P&L)', function(root){
+  renderQuarterlyReport(root, DATA.pnl, { highlightTTs:[1,4,10] });
+});
+
+registerTab('sl-luong', 'Sản lượng & Lương', function(root){
+  renderQuarterlyReport(root, DATA.slLuong, { highlightTTs:[] });
+});
+</script>
+<script>
+// =========================================================================
+// TAB: Hợp đồng tồn
+// =========================================================================
+registerTab('backlog', 'Hợp đồng tồn', function(root){
+  root.innerHTML = `
+    <div class="subtabs">
+      <button data-v="tonghop" class="active">Tổng hợp kế hoạch ghi nhận DT</button>
+      <button data-v="tk">Chi tiết — Hợp đồng thiết kế</button>
+      <button data-v="tc">Chi tiết — Hợp đồng thi công</button>
+    </div>
+    <div id="backlogBody"></div>
+  `;
+  const body = document.getElementById('backlogBody');
+  let view = 'tonghop';
+  root.querySelectorAll('.subtabs button').forEach(b=> b.addEventListener('click', ()=>{
+    root.querySelectorAll('.subtabs button').forEach(x=>x.classList.toggle('active', x===b));
+    view = b.dataset.v; draw();
+  }));
+
+  function draw(){
+    if (view === 'tonghop') return drawTongHop();
+    return drawChiTiet(view === 'tk' ? DATA.hopDongTonTK : DATA.hopDongTonTC, view);
+  }
+
+  function drawTongHop(){
+    const d = DATA.hopDongTonTongHop;
+    if (!d){ body.innerHTML = '<p class="muted">Không có dữ liệu.</p>'; return; }
+    body.innerHTML = `
+      <div class="charts-row"><div class="card" style="grid-column:1/-1;"><h3>Ghi nhận doanh thu hợp đồng tồn theo tháng</h3><div class="chart-wrap"><canvas id="chBacklogMonth"></canvas></div></div></div>
+      <div class="grid2">
+        ${d.sections.map((s,i)=>`
+          <div class="card"><h3>${s.title}</h3>
+            <div class="table-scroll"><table class="dt"><thead><tr><th>Loại HĐ</th>${d.monthLabels.map(m=>`<th class="num">${m}</th>`).join('')}<th class="num">Tổng</th></tr></thead>
+            <tbody>${s.rows.map(r=>`<tr><td class="name-cell">${escapeHtml(r.name)}</td>${r.months.map(v=>`<td class="num ${v<0?'neg':''}">${fmtNum(v)}</td>`).join('')}<td class="num">${fmtVND(r.total)}</td></tr>`).join('')}
+            ${s.total ? `<tr class="lvl0"><td class="name-cell">Tổng</td>${s.total.months.map(v=>`<td class="num">${fmtNum(v)}</td>`).join('')}<td class="num">${fmtVND(s.total.total)}</td></tr>` : ''}
+            </tbody></table></div>
+          </div>`).join('')}
+      </div>`;
+    const kh = d.sections[0], th = d.sections[1];
+    upsertChart('chBacklogMonth', { type:'bar', data:{ labels: d.monthLabels, datasets:[
+      { label:'Kế hoạch', data: kh&&kh.total?kh.total.months:[], backgroundColor: COLOR_PLAN },
+      { label:'Thực hiện', data: th&&th.total?th.total.months:[], backgroundColor: COLOR_ACTUAL } ]},
+      options: baseChartOpts() });
+  }
+
+  function noteBadge(note){
+    if (!note) return '';
+    const n = note.toLowerCase();
+    if (n.includes('vướng')) return `<span class="badge bad">${escapeHtml(note)}</span>`;
+    if (n.includes('bảo lưu')) return `<span class="badge warn">${escapeHtml(note)}</span>`;
+    if (n.includes('thanh lý')) return `<span class="badge neutral">${escapeHtml(note)}</span>`;
+    return `<span class="badge info">${escapeHtml(note)}</span>`;
+  }
+
+  function drawChiTiet(items, key){
+    const totalHD = items.reduce((a,x)=>a+x.giaTriHopDong,0);
+    const totalPaid = items.reduce((a,x)=>a+x.daThanhToan,0);
+    const totalRemain = items.reduce((a,x)=>a+x.conPhaiThu,0);
+    const totalExpected = items.reduce((a,x)=>a+x.duKienGhiNhan,0);
+
+    body.innerHTML = `
+      <div class="kpis">
+        ${kpiCard('Tổng giá trị hợp đồng', fmtVND(totalHD), items.length + ' dự án')}
+        ${kpiCard('Đã thanh toán', fmtVND(totalPaid), fmtPctRatio(totalPaid,totalHD)+' giá trị HĐ')}
+        ${kpiCard('Còn phải thu theo HĐ', fmtVND(totalRemain))}
+        ${kpiCard('Dự kiến ghi nhận DT', fmtVND(totalExpected))}
+      </div>
+      <div id="backlogTableMount"></div>`;
+
+    createTable(document.getElementById('backlogTableMount'), {
+      rows: items, searchPlaceholder:'Tìm mã hoặc tên dự án…', searchKeys:['maDuAn','tenDuAn','note'],
+      sortKey:'conPhaiThu',
+      columns: [
+        { key:'stt', label:'STT', numeric:true },
+        { key:'maDuAn', label:'Mã dự án' },
+        { key:'tenDuAn', label:'Tên dự án', nameCell:true },
+        { key:'giaTriHopDong', label:'Giá trị HĐ', numeric:true },
+        { key:'daThanhToan', label:'Đã thanh toán', numeric:true },
+        { key:'conPhaiThu', label:'Còn phải thu', numeric:true },
+        { key:'daGhiNhan', label:'Đã ghi nhận DT', numeric:true },
+        { key:'duKienGhiNhan', label:'DT dự kiến ghi nhận', numeric:true },
+        { key:'thangGhiNhan', label:'Tháng GN' },
+        { key:'note', label:'Ghi chú', render: r => noteBadge(r.note), sortable:false }
+      ]
+    });
+  }
+  draw();
+});
+
+// =========================================================================
+// TAB: Chi phí
+// =========================================================================
+registerTab('costs', 'Chi phí', function(root){
+  root.innerHTML = `
+    <div class="subtabs">
+      <button data-v="cpcd" class="active">CP cố định (KH vs TH)</button>
+      <button data-v="kmp">KMP — chi tiết khoản mục</button>
+      <button data-v="cp">CP — kết xuất kế toán</button>
+      <button data-v="ct">Chi tiết một số khoản mục</button>
+    </div>
+    <div id="costsBody"></div>`;
+  const body = document.getElementById('costsBody');
+  let view = 'cpcd';
+  root.querySelectorAll('.subtabs button').forEach(b=> b.addEventListener('click', ()=>{
+    root.querySelectorAll('.subtabs button').forEach(x=>x.classList.toggle('active', x===b));
+    view = b.dataset.v; draw();
+  }));
+
+  function draw(){
+    if (view==='cpcd') return drawCPCoDinh();
+    if (view==='kmp') return drawKMP();
+    if (view==='cp') return drawCP();
+    return drawChiTiet();
+  }
+
+  function drawCPCoDinh(){
+    const d = DATA.cpCoDinh;
+    if (!d){ body.innerHTML = '<p class="muted">Không có dữ liệu.</p>'; return; }
+    const kmpGroup = d.groups[0];
+    body.innerHTML = `
+      <div class="kpis">
+        ${d.groups.map(g => kpiCard(g.title, fmtVND(g.thucHien), 'Kế hoạch quý: '+fmtVND(g.keHoach)+' · Chênh lệch: '+fmtVND(g.chenhLech), signClass(g.chenhLech)))}
+      </div>
+      <div class="charts-row"><div class="card" style="grid-column:1/-1;"><h3>${kmpGroup?kmpGroup.title:''} — Kế hoạch vs Thực hiện Q1</h3><div class="chart-wrap" style="height:340px;"><canvas id="chCPCD"></canvas></div></div></div>
+      <div id="cpcdTableMount"></div>`;
+
+    const rows = kmpGroup ? kmpGroup.rows : [];
+    upsertChart('chCPCD', { type:'bar', data:{ labels: rows.map(r=>r.name), datasets:[
+      { label:'Kế hoạch', data: rows.map(r=>r.keHoach), backgroundColor: COLOR_PLAN },
+      { label:'Thực hiện Q1', data: rows.map(r=>r.q1), backgroundColor: COLOR_ACTUAL } ]},
+      options: baseChartOpts({ indexAxis:'y', scales:{ x:{ ticks:{callback:v=>fmtNum(v)} } } }) });
+
+    createTable(document.getElementById('cpcdTableMount'), {
+      rows: d.groups.flatMap(g => g.rows), searchPlaceholder:'Tìm khoản mục chi phí…', searchKeys:['name','maPhi'],
+      columns: [
+        { key:'tt', label:'TT', numeric:true },
+        { key:'name', label:'Nội dung', nameCell:true },
+        { key:'maPhi', label:'Mã' },
+        { key:'keHoach', label:'Kế hoạch', numeric:true },
+        { key:'q1', label:'TH Q1', numeric:true }, { key:'q2', label:'TH Q2', numeric:true },
+        { key:'q3', label:'TH Q3', numeric:true }, { key:'q4', label:'TH Q4', numeric:true },
+        { key:'tong', label:'Tổng', numeric:true },
+        { key:'chenhLech', label:'Chênh lệch TB/KH', numeric:true }
+      ]
+    });
+  }
+
+  function drawKMP(){
+    const d = DATA.kmp;
+    if (!d){ body.innerHTML = '<p class="muted">Không có dữ liệu.</p>'; return; }
+    const groups = d.rows.filter(r=>r.level===0);
+    body.innerHTML = `
+      <div class="kpis">
+        ${kpiCard('Tổng kế hoạch (quý)', fmtVND(d.grandTotal?d.grandTotal.keHoach:0))}
+        ${kpiCard('Tổng thực hiện Q1', fmtVND(d.grandTotal?d.grandTotal.q1:0))}
+        ${kpiCard('Chênh lệch TB/KH', fmtVND(d.grandTotal?d.grandTotal.chenhLech:0), '', signClass(d.grandTotal?d.grandTotal.chenhLech:0))}
+      </div>
+      <div class="charts-row"><div class="card" style="grid-column:1/-1;"><h3>Thực hiện Q1 theo nhóm chi phí</h3><div class="chart-wrap"><canvas id="chKMP"></canvas></div></div></div>
+      <div id="kmpTableMount"></div>`;
+    upsertChart('chKMP', { type:'bar', data:{ labels: groups.map(g=>g.tenPhi), datasets:[
+      { label:'Kế hoạch', data: groups.map(g=>g.keHoach), backgroundColor: COLOR_PLAN },
+      { label:'Thực hiện Q1', data: groups.map(g=>g.q1), backgroundColor: COLOR_ACTUAL } ]},
+      options: baseChartOpts() });
+
+    createTable(document.getElementById('kmpTableMount'), {
+      rows: d.rows, searchPlaceholder:'Tìm mã phí hoặc tên phí…', searchKeys:['maPhi','tenPhi','maTHCP'],
+      paginate: true, pageSize: 100,
+      rowClass: r => 'lvl'+r.level,
+      columns: [
+        { key:'maPhi', label:'Mã phí' },
+        { key:'tenPhi', label:'Tên phí', nameCell:true, render: r => `<span style="padding-left:${r.level*16}px;display:inline-block;">${escapeHtml(r.tenPhi)}</span>` },
+        { key:'keHoach', label:'Kế hoạch (quý)', numeric:true },
+        { key:'q1', label:'TH Q1', numeric:true }, { key:'q2', label:'TH Q2', numeric:true },
+        { key:'q3', label:'TH Q3', numeric:true }, { key:'q4', label:'TH Q4', numeric:true },
+        { key:'tong', label:'Tổng', numeric:true },
+        { key:'chenhLech', label:'Chênh lệch TB/KH', numeric:true }
+      ]
+    });
+  }
+
+  function drawCP(){
+    const items = DATA.cp;
+    const total = items.reduce((a,x)=>a+x.tienPS,0);
+    body.innerHTML = `
+      <div class="kpis">${kpiCard('Tổng tiền phát sinh', fmtVND(total), items.length+' khoản mục')}</div>
+      <div id="cpTableMount"></div>`;
+    createTable(document.getElementById('cpTableMount'), {
+      rows: items, searchPlaceholder:'Tìm mã phí hoặc tên phí…', searchKeys:['maPhi','tenPhi'],
+      sortKey:'tienPS',
+      columns: [
+        { key:'stt', label:'Stt', numeric:true },
+        { key:'maPhi', label:'Mã phí' },
+        { key:'tenPhi', label:'Tên mã phí', nameCell:true },
+        { key:'tienPS', label:'Tiền PS', numeric:true },
+        { key:'group', label:'Group', numeric:true },
+        { key:'ec', label:'EC', numeric:true }
+      ]
+    });
+  }
+
+  function drawChiTiet(){
+    const items = DATA.chiTietPhi;
+    body.innerHTML = `
+      <div class="charts-row"><div class="card" style="grid-column:1/-1;"><h3>Chi tiết một số khoản mục phí</h3><div class="chart-wrap"><canvas id="chChiTiet"></canvas></div></div></div>
+      <div id="ctTableMount"></div>`;
+    upsertChart('chChiTiet', { type:'bar', data:{ labels: items.map(i=>i.name), datasets:[
+      { label:'Số tiền', data: items.map(i=>i.value), backgroundColor: PALETTE[0] } ]},
+      options: baseChartOpts({ indexAxis:'y', plugins:{legend:{display:false}} }) });
+    createTable(document.getElementById('ctTableMount'), {
+      rows: items, searchPlaceholder:'Tìm khoản mục…', searchKeys:['name'], paginate:false,
+      columns: [ { key:'name', label:'Khoản mục', nameCell:true }, { key:'value', label:'Số tiền', numeric:true } ]
+    });
+  }
+  draw();
+});
+
+// =========================================================================
+// TAB: Nhân sự & Lương cố định
+// =========================================================================
+registerTab('nsluong', 'Nhân sự & Lương', function(root){
+  const d = DATA.nsLuong;
+  if (!d){ root.innerHTML = '<p class="muted">Không có dữ liệu.</p>'; return; }
+  let activeDept = 'ALL';
+
+  root.innerHTML = `
+    <div class="kpis">
+      ${kpiCard('Tổng số nhân sự kế hoạch', d.departments.reduce((a,x)=>a+x.employees.length,0))}
+      ${kpiCard('Tổng lương cơ bản', fmtVND(d.departments.reduce((a,x)=>a+x.luongCoBan,0)))}
+      ${kpiCard('Tổng chi phí BHXH (21.5%)', fmtVND(d.departments.reduce((a,x)=>a+x.bhxh,0)))}
+    </div>
+    <div class="charts-row"><div class="card" style="grid-column:1/-1;"><h3>Lương cơ bản theo phòng ban</h3><div class="chart-wrap"><canvas id="chDept"></canvas></div></div></div>
+    <div class="dept-chips" id="deptChips"></div>
+    <div id="empTableMount"></div>`;
+
+  upsertChart('chDept', { type:'bar', data:{ labels: d.departments.map(x=>x.name), datasets:[
+    { label:'Lương cơ bản', data: d.departments.map(x=>x.luongCoBan), backgroundColor: PALETTE[1] },
+    { label:'Chi phí BHXH', data: d.departments.map(x=>x.bhxh), backgroundColor: PALETTE[2] } ]},
+    options: baseChartOpts() });
+
+  const chips = document.getElementById('deptChips');
+  const allBtn = document.createElement('button'); allBtn.textContent='Tất cả phòng ban'; allBtn.className='active';
+  allBtn.addEventListener('click', ()=>select('ALL', allBtn));
+  chips.appendChild(allBtn);
+  d.departments.forEach(dept=>{
+    const b = document.createElement('button'); b.textContent = dept.name + ' (' + dept.employees.length + ')';
+    b.addEventListener('click', ()=>select(dept.name, b));
+    chips.appendChild(b);
+  });
+
+  let table;
+  function select(name, btn){
+    activeDept = name;
+    chips.querySelectorAll('button').forEach(b=>b.classList.toggle('active', b===btn));
+    const rows = name === 'ALL' ? d.departments.flatMap(x=>x.employees) : d.departments.find(x=>x.name===name).employees;
+    if (table) table.setRows(rows); else buildTable(rows);
+  }
+  function buildTable(rows){
+    table = createTable(document.getElementById('empTableMount'), {
+      rows, searchPlaceholder:'Tìm chức vụ hoặc họ tên…', searchKeys:['chucVu','hoTen'],
+      columns: [
+        { key:'tt', label:'TT', numeric:true },
+        { key:'chucVu', label:'Chức vụ', nameCell:true },
+        { key:'hoTen', label:'Họ và tên' },
+        { key:'luongCoBan', label:'Lương cơ bản', numeric:true },
+        { key:'maCP', label:'Mã CP' },
+        { key:'luongDongBH', label:'Lương đóng BH', numeric:true },
+        { key:'bhxh', label:'Chi phí BHXH (21,5%)', numeric:true }
+      ]
+    });
+  }
+  buildTable(d.departments.flatMap(x=>x.employees));
+});
+
+// =========================================================================
+// TAB: Khấu hao CCDC
+// =========================================================================
+registerTab('khauhao', 'Khấu hao CCDC', function(root){
+  const items = DATA.khauHao;
+  const totalNG = items.reduce((a,x)=>a+x.nguyenGia,0);
+  const totalPBLK = items.reduce((a,x)=>a+x.gtPBLuyKe,0);
+  const totalConLai = items.reduce((a,x)=>a+x.gtConLai,0);
+
+  root.innerHTML = `
+    <div class="kpis">
+      ${kpiCard('Số CCDC đang theo dõi', items.length)}
+      ${kpiCard('Tổng nguyên giá', fmtVND(totalNG))}
+      ${kpiCard('Đã phân bổ lũy kế', fmtVND(totalPBLK), fmtPctRatio(totalPBLK,totalNG)+' nguyên giá')}
+      ${kpiCard('Giá trị còn lại', fmtVND(totalConLai))}
+    </div>
+    <div class="charts-row"><div class="card" style="grid-column:1/-1;"><h3>Giá trị còn lại theo tài khoản chi phí</h3><div class="chart-wrap"><canvas id="chKhauHao"></canvas></div></div></div>
+    <div id="khTableMount"></div>`;
+
+  const byTkCp = {};
+  items.forEach(i => { byTkCp[i.tkCP||'—'] = (byTkCp[i.tkCP||'—']||0) + i.gtConLai; });
+  const labels = Object.keys(byTkCp);
+  upsertChart('chKhauHao', { type:'bar', data:{ labels, datasets:[
+    { label:'Giá trị còn lại', data: labels.map(l=>byTkCp[l]), backgroundColor: PALETTE[3] } ]},
+    options: baseChartOpts({ plugins:{legend:{display:false}} }) });
+
+  createTable(document.getElementById('khTableMount'), {
+    rows: items, searchPlaceholder:'Tìm mã hoặc tên công cụ…', searchKeys:['maCC','tenCC','soThe','maPhi'],
+    paginate:true, pageSize:100,
+    columns: [
+      { key:'maCC', label:'Mã công cụ' },
+      { key:'tenCC', label:'Tên công cụ', nameCell:true },
+      { key:'ngayTinh', label:'Ngày tính p.bổ', numeric:false },
+      { key:'soKyPB', label:'Số kỳ p.bổ', numeric:true },
+      { key:'nguyenGia', label:'Nguyên giá', numeric:true },
+      { key:'gtPBTrongKy', label:'PB trong kỳ', numeric:true },
+      { key:'gtPBLuyKe', label:'PB lũy kế', numeric:true },
+      { key:'gtConLai', label:'Còn lại', numeric:true },
+      { key:'tkCP', label:'Tk CP' },
+      { key:'maPhi', label:'Mã phí' }
+    ]
+  });
+});
+
+// =========================================================================
+// TAB: Thuế & Dự phòng
+// =========================================================================
+registerTab('thue', 'Thuế & Dự phòng', function(root){
+  const d = DATA.cpThueDuPhong;
+  if (!d){ root.innerHTML = '<p class="muted">Không có dữ liệu.</p>'; return; }
+  root.innerHTML = `
+    <div class="kpis">${d.groups.map(g => kpiCard(g.name, fmtVND(g.thucHien), 'Kế hoạch: '+fmtVND(g.keHoach)+' · EC: '+fmtVND(g.thucHienEC))).join('')}</div>
+    ${d.groups.map(g => `
+      <div class="section-title">${g.code} — ${g.name}</div>
+      <div class="table-scroll"><table class="dt"><thead><tr><th>TT</th><th>Nội dung</th><th class="num">Số tiền/Kế hoạch</th><th class="num">Thực hiện</th><th class="num">Thực hiện EC</th></tr></thead>
+      <tbody>${g.items.length ? g.items.map(it => `<tr><td>${it.tt}</td><td class="name-cell">${escapeHtml(it.name)}</td><td class="num">${fmtVND(it.keHoach)}</td><td class="num">${fmtVND(it.thucHien)}</td><td class="num">${fmtVND(it.thucHienEC)}</td></tr>`).join('')
+        : `<tr><td colspan="5" class="muted" style="text-align:center;padding:14px;">Chưa có phát sinh</td></tr>`}</tbody></table></div>
+    `).join('')}
+  `;
+});
+
+// =========================================================================
+// Global search
+// =========================================================================
+function buildSearchIndex(){
+  const idx = [];
+  (DATA.hopDongTonTK||[]).forEach(x => idx.push({ tab:'backlog', label: x.tenDuAn, sub:'HĐ tồn — Thiết kế · '+x.maDuAn, text: x.maDuAn+' '+x.tenDuAn }));
+  (DATA.hopDongTonTC||[]).forEach(x => idx.push({ tab:'backlog', label: x.tenDuAn, sub:'HĐ tồn — Thi công · '+x.maDuAn, text: x.maDuAn+' '+x.tenDuAn }));
+  (DATA.kmp?DATA.kmp.rows:[]).forEach(x => idx.push({ tab:'costs', label: x.tenPhi, sub:'KMP · '+x.maPhi, text: x.maPhi+' '+x.tenPhi }));
+  (DATA.cp||[]).forEach(x => idx.push({ tab:'costs', label: x.tenPhi, sub:'CP kế toán · '+x.maPhi, text: x.maPhi+' '+x.tenPhi }));
+  (DATA.khauHao||[]).forEach(x => idx.push({ tab:'khauhao', label: x.tenCC, sub:'Khấu hao · '+x.maCC, text: x.maCC+' '+x.tenCC }));
+  if (DATA.pnl) DATA.pnl.sections.forEach(s => s.rows.forEach(r => idx.push({ tab:'pnl', label: r.name, sub:'P&L · '+s.title, text: r.name })));
+  return idx;
+}
+function initGlobalSearch(){
+  const input = document.getElementById('globalSearch');
+  const box = document.getElementById('globalSearchResults');
+  const index = buildSearchIndex();
+  input.addEventListener('input', debounce(()=>{
+    const q = normalize(input.value.trim());
+    if (q.length < 2){ box.style.display='none'; return; }
+    const matches = index.filter(x => normalize(x.text).includes(q)).slice(0, 20);
+    box.innerHTML = matches.length
+      ? matches.map(m => `<div class="gr-item" data-tab="${m.tab}"><div>${escapeHtml(m.label)}</div><div class="muted">${escapeHtml(m.sub)}</div></div>`).join('')
+      : `<div class="gr-item muted">Không tìm thấy kết quả</div>`;
+    box.style.display = 'block';
+    box.querySelectorAll('.gr-item[data-tab]').forEach(el => el.addEventListener('click', ()=>{
+      activateTab(el.dataset.tab); box.style.display='none'; input.value='';
+    }));
+  }, 150));
+  document.addEventListener('click', (e)=>{ if (!e.target.closest('#globalSearch') && !e.target.closest('#globalSearchResults')) box.style.display='none'; });
+}
+
+// =========================================================================
+// Boot
+// =========================================================================
+// TABS is populated once, at script-parse time, by the registerTab() calls
+// above. A refresh just needs a clean DOM and to re-run each builder
+// against the freshly-fetched DATA — the tab registry itself never changes.
+function renderAll(){
+  document.getElementById('views').innerHTML = '';
+  document.getElementById('tabs').innerHTML = '';
+  Object.keys(charts).forEach(id => { charts[id].destroy(); delete charts[id]; });
+  initTabs();
+  TABS.forEach(t => t.buildFn(document.getElementById('view-'+t.id)));
+  initGlobalSearch();
+}
+
+function loadData(){
+  document.getElementById('loading').style.display = 'flex';
+  document.getElementById('errorBanner').style.display = 'none';
+  google.script.run
+    .withSuccessHandler(function(data){
+      DATA = data;
+      document.getElementById('metaLine').textContent =
+        data.meta.name + ' · cập nhật lúc ' + new Date(data.meta.generatedAt).toLocaleString('vi-VN');
+      renderAll();
+      document.getElementById('loading').style.display = 'none';
+    })
+    .withFailureHandler(function(err){
+      document.getElementById('loading').style.display = 'none';
+      const banner = document.getElementById('errorBanner');
+      banner.textContent = 'Lỗi tải dữ liệu: ' + (err && err.message ? err.message : err);
+      banner.style.display = 'block';
+    })
+    .getDashboardData();
+}
+
+document.getElementById('refreshBtn').addEventListener('click', loadData);
+document.getElementById('clearFiltersBtn').addEventListener('click', ()=> renderAll());
+loadData();
+</script>
