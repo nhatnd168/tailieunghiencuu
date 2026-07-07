@@ -5,8 +5,11 @@
  * used range via getDataRange()/getLastRow() and locates its header row
  * and section markers by matching the anchor text the report template
  * always contains ("TT", "Mã dự án", roman-numeral group codes, the
- * A/B/C KẾ HOẠCH / THỰC HIỆN / CHÊNH LỆCH markers, ...). That way the
- * dashboard keeps working as rows are added next quarter.
+ * A/B/C KẾ HOẠCH / THỰC HIỆN / CHÊNH LỆCH markers, ...). The number of
+ * period columns (quarterly Quý1..4 vs monthly Tháng1..12 / Thực hiện
+ * T1..12) is likewise detected from the header via detectPeriodColumns_,
+ * not assumed - so the dashboard keeps working whether the source sheet
+ * reports quarterly or monthly, and as rows are added in future periods.
  */
 
 // ---- generic helpers --------------------------------------------------
@@ -48,6 +51,32 @@ function str_(v) {
   return String(v || '').trim();
 }
 
+function normalizeAscii_(v) {
+  return String(v || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase().trim();
+}
+
+/**
+ * Scans a header row starting at startCol and collects consecutive period
+ * labels (quarters, months, ...) until it hits the "Tổng" column. The
+ * report template switches between quarterly and monthly cadence from one
+ * period to the next, so callers must never assume a fixed column count -
+ * this makes the number of periods (and where "Tổng"/the next column
+ * live) derived from the sheet itself.
+ */
+function detectPeriodColumns_(header, startCol) {
+  var labels = [];
+  var c = startCol;
+  while (c < header.length) {
+    var text = str_(header[c]);
+    if (!text || normalizeAscii_(text).indexOf('tong') === 0) break;
+    labels.push(text);
+    c++;
+  }
+  return { labels: labels, totalCol: c };
+}
+
 /** Classifies a data row (not a section marker) into a display depth. */
 function classifyIndent_(colA, name) {
   if (isRoman_(colA)) return { kind: 'group', indent: 0 };
@@ -60,11 +89,15 @@ function classifyIndent_(colA, name) {
 }
 
 // ---- P&L (3) and SL&Lương ----------------------------------------------
-// Both sheets share the exact same shape: a "TT | <name> | Quý1..Quý4 |
+// Both sheets share the exact same shape: a "TT | <name> | <periods...> |
 // Tổng | Tỷ lệ" header, followed by three back-to-back sections marked
 // A/B/C = KẾ HOẠCH / THỰC HIỆN / CHÊNH LỆCH. SL&Lương additionally nests
 // roman-numeral groups (I/II/III) inside each section; P&L doesn't -
 // classifyIndent_ handles both without the caller needing to know which.
+// The reporting cadence itself changes between exports (quarterly "Quý
+// 1..4" one period, monthly "Tháng 1..12" the next) so the number of
+// period columns - and therefore where Tổng/Tỷ lệ land - is detected from
+// the header row rather than assumed.
 
 function parseQuarterlyReport_(ss, sheetName) {
   var data = getValues_(ss, sheetName);
@@ -73,8 +106,11 @@ function parseQuarterlyReport_(ss, sheetName) {
   if (headerRow === -1) return null;
   var header = data[headerRow];
   var nameLabel = str_(header[1]) || 'Chỉ tiêu';
-  var valueLabels = [2, 3, 4, 5].map(function (c) { return str_(header[c]); });
-  var totalLabel = str_(header[6]) || 'Tổng';
+  var period = detectPeriodColumns_(header, 2);
+  var valueLabels = period.labels;
+  var totalCol = period.totalCol;
+  var ratioCol = totalCol + 1;
+  var totalLabel = str_(header[totalCol]) || 'Tổng';
 
   var sections = [];
   var current = null;
@@ -93,9 +129,9 @@ function parseQuarterlyReport_(ss, sheetName) {
       tt: (typeof colA === 'number') ? colA : (typeof colA === 'string' ? colA.trim() : null),
       name: str_(colB),
       indent: cls.indent,
-      values: [2, 3, 4, 5].map(function (c) { return num_(row[c]); }),
-      total: num_(row[6]),
-      ratio: (typeof row[7] === 'number') ? row[7] : null
+      values: valueLabels.map(function (_, i) { return num_(row[2 + i]); }),
+      total: num_(row[totalCol]),
+      ratio: (typeof row[ratioCol] === 'number') ? row[ratioCol] : null
     });
   }
   return { nameLabel: nameLabel, valueLabels: valueLabels, totalLabel: totalLabel, sections: sections };
@@ -175,12 +211,21 @@ function parseHopDongTonChiTiet_(ss, sheetName) {
 }
 
 // ---- CP cố định: fixed-cost budget vs actual ---------------------------
+// "Thực hiện" columns are quarterly (Q1..Q4) in some exports and monthly
+// (T1..T12) in others - detected from the header, not assumed.
 
 function parseCPCoDinh_(ss) {
   var data = getValues_(ss, 'CP cố định');
   if (!data.length) return null;
   var headerRow = findRow_(data, 0, function (v) { return textEq_(v, 'TT'); });
   if (headerRow === -1) return null;
+  var header = data[headerRow];
+  var period = detectPeriodColumns_(header, 4);
+  var periodLabels = period.labels;
+  var totalCol = period.totalCol;
+  var chenhLechCol = totalCol + 1;
+  var keHoachLabel = str_(header[3]) || 'Kế hoạch';
+
   var groups = [];
   var current = null;
   for (var r = headerRow + 1; r < data.length; r++) {
@@ -189,7 +234,7 @@ function parseCPCoDinh_(ss) {
     if (isRoman_(colA) && str_(colB)) {
       current = {
         code: str_(colA), title: str_(colB),
-        keHoach: num_(row[3]), thucHien: num_(row[8]), chenhLech: num_(row[9]),
+        keHoach: num_(row[3]), thucHien: num_(row[totalCol]), chenhLech: num_(row[chenhLechCol]),
         rows: []
       };
       groups.push(current);
@@ -200,21 +245,29 @@ function parseCPCoDinh_(ss) {
       current.rows.push({
         tt: colA, name: str_(colB), maPhi: str_(row[2]),
         keHoach: num_(row[3]),
-        q1: num_(row[4]), q2: num_(row[5]), q3: num_(row[6]), q4: num_(row[7]),
-        tong: num_(row[8]), chenhLech: num_(row[9])
+        periods: periodLabels.map(function (_, i) { return num_(row[4 + i]); }),
+        tong: num_(row[totalCol]), chenhLech: num_(row[chenhLechCol])
       });
     }
   }
-  return { groups: groups };
+  return { keHoachLabel: keHoachLabel, periodLabels: periodLabels, groups: groups };
 }
 
 // ---- KMP: granular cost-item report (3-level fee-code hierarchy) ------
+// Same quarterly-vs-monthly "Thực hiện" ambiguity as CP cố định.
 
 function parseKMP_(ss) {
   var data = getValues_(ss, 'KMP');
   if (!data.length) return null;
   var headerRow = findRow_(data, 0, function (v) { return textEq_(v, 'Mã THCP'); });
   if (headerRow === -1) return null;
+  var header = data[headerRow];
+  var period = detectPeriodColumns_(header, 4);
+  var periodLabels = period.labels;
+  var totalCol = period.totalCol;
+  var chenhLechCol = totalCol + 1;
+  var keHoachLabel = str_(header[3]) || 'Kế hoạch';
+
   var rows = [];
   var grandTotal = null;
   for (var r = headerRow + 1; r < data.length; r++) {
@@ -225,8 +278,8 @@ function parseKMP_(ss) {
     if (!maPhi && tenPhi.toUpperCase() === 'TỔNG') {
       grandTotal = {
         keHoach: num_(row[3]),
-        q1: num_(row[4]), q2: num_(row[5]), q3: num_(row[6]), q4: num_(row[7]),
-        tong: num_(row[8]), chenhLech: num_(row[9])
+        periods: periodLabels.map(function (_, i) { return num_(row[4 + i]); }),
+        tong: num_(row[totalCol]), chenhLech: num_(row[chenhLechCol])
       };
       continue;
     }
@@ -234,11 +287,11 @@ function parseKMP_(ss) {
     rows.push({
       maTHCP: str_(row[0]), maPhi: maPhi, tenPhi: tenPhi, level: level,
       keHoach: num_(row[3]),
-      q1: num_(row[4]), q2: num_(row[5]), q3: num_(row[6]), q4: num_(row[7]),
-      tong: num_(row[8]), chenhLech: num_(row[9])
+      periods: periodLabels.map(function (_, i) { return num_(row[4 + i]); }),
+      tong: num_(row[totalCol]), chenhLech: num_(row[chenhLechCol])
     });
   }
-  return { rows: rows, grandTotal: grandTotal };
+  return { keHoachLabel: keHoachLabel, periodLabels: periodLabels, rows: rows, grandTotal: grandTotal };
 }
 
 // ---- NS LƯƠNG CĐ: fixed headcount / payroll plan by department --------

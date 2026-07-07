@@ -1,10 +1,15 @@
 # Xcons Group — Dashboard KQKD (Google Apps Script)
 
-Dashboard nội bộ đọc trực tiếp từ Google Sheet **"Bản sao của Xcons Group_KQKD Q1.26"**
-(`1VXFUQhCGy48lk1FmO-zhjb73hezpuwdP8QWGmSMH5nk`) và hiển thị dưới dạng Web App:
-KQKD (P&L) kế hoạch/thực hiện/chênh lệch theo quý, sản lượng & lương, hợp đồng tồn
+Dashboard nội bộ đọc trực tiếp từ Google Sheet KQKD Xcons Group và hiển thị dưới dạng
+Web App: KQKD (P&L) kế hoạch/thực hiện/chênh lệch, sản lượng & lương, hợp đồng tồn
 (tổng hợp + chi tiết thiết kế/thi công), chi phí (CP cố định, KMP, kết xuất kế toán),
 nhân sự & lương cố định, khấu hao CCDC, thuế & dự phòng.
+
+**Spreadsheet ID hiện đặt trong `Code.gs`** (`SPREADSHEET_ID`) là của bản báo cáo theo
+quý ("Bản sao của Xcons Group_KQKD Q1.26"). Nếu file báo cáo theo tháng
+("Xcons Group_KQKD tháng 05.26") sống ở một Google Sheet khác, **cập nhật hằng số
+`SPREADSHEET_ID` ở đầu `Code.gs`** thành ID của Sheet đó trước khi deploy — dashboard
+không thể tự suy ra ID từ một file .xlsx tải lên ngoài Google Sheets.
 
 ## Vì sao không phải "dashboard tổng quát theo kiểu cột"
 
@@ -12,9 +17,16 @@ File KQKD này không phải bảng dữ liệu phẳng — mỗi sheet là mộ
 riêng (dòng tiêu đề, mục KẾ HOẠCH/THỰC HIỆN/CHÊNH LỆCH, nhóm La Mã, mã phí phân cấp…).
 Vì vậy backend không dùng "dò kiểu cột chung" mà đọc đúng cấu trúc thật của từng sheet
 (xem `Parsers.gs`), tương tự cách một kế toán đọc báo cáo. Mọi range đều được đọc động
-qua `getLastRow()`/`getDataRange()` — không hardcode số dòng — nên báo cáo quý sau vẫn
+qua `getLastRow()`/`getDataRange()` — không hardcode số dòng — nên báo cáo kỳ sau vẫn
 chạy đúng khi số dòng thay đổi, miễn cấu trúc mốc (TT, KẾ HOẠCH/THỰC HIỆN/CHÊNH LỆCH,
 mã La Mã, "Mã dự án", "Mã THCP"…) không đổi.
+
+**Kỳ báo cáo (quý hay tháng) cũng được dò tự động, không hardcode.** Các sheet P&L,
+SL&Lương, CP cố định, KMP có lúc báo cáo theo quý (4 cột "Quý 1..4" / "Thực hiện quý
+1..4") có lúc theo tháng (12 cột "Tháng 1..12" / "Thực hiện T1..12" / "Thực hiện tháng
+1..12") — `detectPeriodColumns_` trong `Parsers.gs` đọc đúng số cột kỳ và vị trí cột
+"Tổng"/"Chênh lệch" từ dòng tiêu đề thay vì giả định cố định 4 quý, nên cùng một bản
+dashboard chạy đúng với cả hai kiểu file.
 
 ## Cấu trúc file
 

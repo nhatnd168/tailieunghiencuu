@@ -284,11 +284,11 @@ registerTab('overview', 'Tổng quan', function(root){
       ${kpiCard('Chi phí — Kế hoạch / Thực hiện', fmtVND(cpTH?cpTH.total:0), 'Kế hoạch: ' + fmtVND(cpKH?cpKH.total:0))}
       ${kpiCard('Tổng lợi nhuận — Thực hiện', fmtVND(lnTH?lnTH.total:0), 'Kế hoạch: ' + fmtVND(lnKH?lnKH.total:0), signClass(lnTH?lnTH.total:0))}
       ${kpiCard('Giá trị hợp đồng tồn — còn phải thu', fmtVND(backlogTK+backlogTC), `Thiết kế ${fmtVND(backlogTK)} · Thi công ${fmtVND(backlogTC)}`)}
-      ${kpiCard('Chi phí quản lý/bán hàng (KMP) — Thực hiện Q1', kmpTotal?fmtVND(kmpTotal.q1):'—', kmpTotal?('Kế hoạch quý: '+fmtVND(kmpTotal.keHoach)):'')}
+      ${kpiCard('Chi phí quản lý/bán hàng (KMP) — Thực hiện lũy kế', kmpTotal?fmtVND(kmpTotal.tong):'—', kmpTotal&&DATA.kmp?(DATA.kmp.keHoachLabel+': '+fmtVND(kmpTotal.keHoach)):'')}
     </div>
     <div class="charts-row">
-      <div class="card"><h3>Doanh thu thuần theo quý <span class="hint">Kế hoạch vs Thực hiện</span></h3><div class="chart-wrap"><canvas id="chOvRevenue"></canvas></div></div>
-      <div class="card"><h3>Tổng lợi nhuận theo quý <span class="hint">Kế hoạch vs Thực hiện</span></h3><div class="chart-wrap"><canvas id="chOvProfit"></canvas></div></div>
+      <div class="card"><h3>Doanh thu thuần theo kỳ <span class="hint">Kế hoạch vs Thực hiện</span></h3><div class="chart-wrap"><canvas id="chOvRevenue"></canvas></div></div>
+      <div class="card"><h3>Tổng lợi nhuận theo kỳ <span class="hint">Kế hoạch vs Thực hiện</span></h3><div class="chart-wrap"><canvas id="chOvProfit"></canvas></div></div>
     </div>
     <div class="charts-row">
       <div class="card"><h3>Cơ cấu chi phí kế hoạch <span class="hint">theo nhóm KMP</span></h3><div class="chart-wrap"><canvas id="chOvCostMix"></canvas></div></div>
@@ -491,21 +491,25 @@ registerTab('costs', 'Chi phí', function(root){
     return drawChiTiet();
   }
 
+  function periodColumns(periodLabels){
+    return periodLabels.map((lbl,i) => ({ key:'p'+i, label: lbl, numeric:true, value: r => r.periods[i] }));
+  }
+
   function drawCPCoDinh(){
     const d = DATA.cpCoDinh;
     if (!d){ body.innerHTML = '<p class="muted">Không có dữ liệu.</p>'; return; }
     const kmpGroup = d.groups[0];
     body.innerHTML = `
       <div class="kpis">
-        ${d.groups.map(g => kpiCard(g.title, fmtVND(g.thucHien), 'Kế hoạch quý: '+fmtVND(g.keHoach)+' · Chênh lệch: '+fmtVND(g.chenhLech), signClass(g.chenhLech)))}
+        ${d.groups.map(g => kpiCard(g.title, fmtVND(g.thucHien), d.keHoachLabel+': '+fmtVND(g.keHoach)+' · Chênh lệch: '+fmtVND(g.chenhLech), signClass(g.chenhLech)))}
       </div>
-      <div class="charts-row"><div class="card" style="grid-column:1/-1;"><h3>${kmpGroup?kmpGroup.title:''} — Kế hoạch vs Thực hiện Q1</h3><div class="chart-wrap" style="height:340px;"><canvas id="chCPCD"></canvas></div></div></div>
+      <div class="charts-row"><div class="card" style="grid-column:1/-1;"><h3>${kmpGroup?kmpGroup.title:''} — Kế hoạch vs Thực hiện lũy kế</h3><div class="chart-wrap" style="height:340px;"><canvas id="chCPCD"></canvas></div></div></div>
       <div id="cpcdTableMount"></div>`;
 
     const rows = kmpGroup ? kmpGroup.rows : [];
     upsertChart('chCPCD', { type:'bar', data:{ labels: rows.map(r=>r.name), datasets:[
       { label:'Kế hoạch', data: rows.map(r=>r.keHoach), backgroundColor: COLOR_PLAN },
-      { label:'Thực hiện Q1', data: rows.map(r=>r.q1), backgroundColor: COLOR_ACTUAL } ]},
+      { label:'Thực hiện lũy kế', data: rows.map(r=>r.tong), backgroundColor: COLOR_ACTUAL } ]},
       options: baseChartOpts({ indexAxis:'y', scales:{ x:{ ticks:{callback:v=>fmtNum(v)} } } }) });
 
     createTable(document.getElementById('cpcdTableMount'), {
@@ -514,9 +518,8 @@ registerTab('costs', 'Chi phí', function(root){
         { key:'tt', label:'TT', numeric:true },
         { key:'name', label:'Nội dung', nameCell:true },
         { key:'maPhi', label:'Mã' },
-        { key:'keHoach', label:'Kế hoạch', numeric:true },
-        { key:'q1', label:'TH Q1', numeric:true }, { key:'q2', label:'TH Q2', numeric:true },
-        { key:'q3', label:'TH Q3', numeric:true }, { key:'q4', label:'TH Q4', numeric:true },
+        { key:'keHoach', label: d.keHoachLabel, numeric:true },
+        ...periodColumns(d.periodLabels),
         { key:'tong', label:'Tổng', numeric:true },
         { key:'chenhLech', label:'Chênh lệch TB/KH', numeric:true }
       ]
@@ -529,15 +532,15 @@ registerTab('costs', 'Chi phí', function(root){
     const groups = d.rows.filter(r=>r.level===0);
     body.innerHTML = `
       <div class="kpis">
-        ${kpiCard('Tổng kế hoạch (quý)', fmtVND(d.grandTotal?d.grandTotal.keHoach:0))}
-        ${kpiCard('Tổng thực hiện Q1', fmtVND(d.grandTotal?d.grandTotal.q1:0))}
+        ${kpiCard('Tổng ' + d.keHoachLabel.toLowerCase(), fmtVND(d.grandTotal?d.grandTotal.keHoach:0))}
+        ${kpiCard('Tổng thực hiện lũy kế', fmtVND(d.grandTotal?d.grandTotal.tong:0))}
         ${kpiCard('Chênh lệch TB/KH', fmtVND(d.grandTotal?d.grandTotal.chenhLech:0), '', signClass(d.grandTotal?d.grandTotal.chenhLech:0))}
       </div>
-      <div class="charts-row"><div class="card" style="grid-column:1/-1;"><h3>Thực hiện Q1 theo nhóm chi phí</h3><div class="chart-wrap"><canvas id="chKMP"></canvas></div></div></div>
+      <div class="charts-row"><div class="card" style="grid-column:1/-1;"><h3>Thực hiện lũy kế theo nhóm chi phí</h3><div class="chart-wrap"><canvas id="chKMP"></canvas></div></div></div>
       <div id="kmpTableMount"></div>`;
     upsertChart('chKMP', { type:'bar', data:{ labels: groups.map(g=>g.tenPhi), datasets:[
       { label:'Kế hoạch', data: groups.map(g=>g.keHoach), backgroundColor: COLOR_PLAN },
-      { label:'Thực hiện Q1', data: groups.map(g=>g.q1), backgroundColor: COLOR_ACTUAL } ]},
+      { label:'Thực hiện lũy kế', data: groups.map(g=>g.tong), backgroundColor: COLOR_ACTUAL } ]},
       options: baseChartOpts() });
 
     createTable(document.getElementById('kmpTableMount'), {
@@ -547,9 +550,8 @@ registerTab('costs', 'Chi phí', function(root){
       columns: [
         { key:'maPhi', label:'Mã phí' },
         { key:'tenPhi', label:'Tên phí', nameCell:true, render: r => `<span style="padding-left:${r.level*16}px;display:inline-block;">${escapeHtml(r.tenPhi)}</span>` },
-        { key:'keHoach', label:'Kế hoạch (quý)', numeric:true },
-        { key:'q1', label:'TH Q1', numeric:true }, { key:'q2', label:'TH Q2', numeric:true },
-        { key:'q3', label:'TH Q3', numeric:true }, { key:'q4', label:'TH Q4', numeric:true },
+        { key:'keHoach', label: d.keHoachLabel, numeric:true },
+        ...periodColumns(d.periodLabels),
         { key:'tong', label:'Tổng', numeric:true },
         { key:'chenhLech', label:'Chênh lệch TB/KH', numeric:true }
       ]
