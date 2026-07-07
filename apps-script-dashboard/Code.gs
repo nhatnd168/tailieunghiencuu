@@ -4,7 +4,7 @@
  * data-fetching endpoint the client calls via google.script.run.
  */
 
-var SPREADSHEET_ID = '1VXFUQhCGy48lk1FmO-zhjb73hezpuwdP8QWGmSMH5nk';
+var SPREADSHEET_ID = '1yupX8VZqHs5mqNRipVPDvJL5iwGCzUgOe8WQEVbrmyI';
 
 function doGet(e) {
   return HtmlService.createTemplateFromFile('index')

@@ -5,11 +5,12 @@ Web App: KQKD (P&L) kế hoạch/thực hiện/chênh lệch, sản lượng & l
 (tổng hợp + chi tiết thiết kế/thi công), chi phí (CP cố định, KMP, kết xuất kế toán),
 nhân sự & lương cố định, khấu hao CCDC, thuế & dự phòng.
 
-**Spreadsheet ID hiện đặt trong `Code.gs`** (`SPREADSHEET_ID`) là của bản báo cáo theo
-quý ("Bản sao của Xcons Group_KQKD Q1.26"). Nếu file báo cáo theo tháng
-("Xcons Group_KQKD tháng 05.26") sống ở một Google Sheet khác, **cập nhật hằng số
-`SPREADSHEET_ID` ở đầu `Code.gs`** thành ID của Sheet đó trước khi deploy — dashboard
-không thể tự suy ra ID từ một file .xlsx tải lên ngoài Google Sheets.
+**Spreadsheet ID hiện đặt trong `Code.gs`** (`SPREADSHEET_ID`) là
+`1yupX8VZqHs5mqNRipVPDvJL5iwGCzUgOe8WQEVbrmyI` — Google Sheet "Xcons Group_KQKD tháng
+05.26" (báo cáo theo tháng). Nếu sau này trỏ dashboard sang một kỳ báo cáo khác nằm ở
+Google Sheet khác, **cập nhật hằng số `SPREADSHEET_ID` ở đầu `Code.gs`** thành ID Sheet
+đó trước khi deploy — dashboard không thể tự suy ra ID từ một file .xlsx tải lên ngoài
+Google Sheets.
 
 ## Vì sao không phải "dashboard tổng quát theo kiểu cột"
 
