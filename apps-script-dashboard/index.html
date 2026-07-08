@@ -119,8 +119,20 @@ const charts = {}; // canvasId -> Chart instance
 function upsertChart(canvasId, config){
   const el = document.getElementById(canvasId);
   if (!el) return;
-  if (charts[canvasId]) charts[canvasId].destroy();
-  charts[canvasId] = new Chart(el.getContext('2d'), config);
+  if (charts[canvasId]) { charts[canvasId].destroy(); delete charts[canvasId]; }
+  // Chart.js loads from a CDN; if the network/CSP blocks it, degrade to a
+  // visible placeholder instead of throwing and aborting the caller (which
+  // would otherwise leave the loading overlay stuck forever).
+  if (typeof Chart === 'undefined'){
+    const wrap = el.closest('.chart-wrap') || el.parentElement;
+    if (wrap) wrap.innerHTML = '<div class="muted" style="padding:20px;text-align:center;">Không tải được thư viện biểu đồ (Chart.js). Kiểm tra kết nối mạng rồi bấm Làm mới.</div>';
+    return;
+  }
+  try {
+    charts[canvasId] = new Chart(el.getContext('2d'), config);
+  } catch (err) {
+    console.error('Chart render failed for', canvasId, err);
+  }
 }
 
 const COLOR_PLAN = '#94a3b8';
@@ -755,8 +767,18 @@ function renderAll(){
   document.getElementById('tabs').innerHTML = '';
   Object.keys(charts).forEach(id => { charts[id].destroy(); delete charts[id]; });
   initTabs();
-  TABS.forEach(t => t.buildFn(document.getElementById('view-'+t.id)));
-  initGlobalSearch();
+  // Each tab renders independently: a bug or bad data in one tab must not
+  // abort the loop and leave later tabs (or the loading overlay) stuck.
+  TABS.forEach(t => {
+    try {
+      t.buildFn(document.getElementById('view-'+t.id));
+    } catch (err) {
+      console.error('Render failed for tab', t.id, err);
+      const view = document.getElementById('view-'+t.id);
+      if (view) view.innerHTML = '<p class="muted">Không thể hiển thị tab này: ' + escapeHtml(err && err.message ? err.message : String(err)) + '</p>';
+    }
+  });
+  try { initGlobalSearch(); } catch (err) { console.error('Global search init failed', err); }
 }
 
 function loadData(){
@@ -764,11 +786,22 @@ function loadData(){
   document.getElementById('errorBanner').style.display = 'none';
   google.script.run
     .withSuccessHandler(function(data){
-      DATA = data;
-      document.getElementById('metaLine').textContent =
-        data.meta.name + ' · cập nhật lúc ' + new Date(data.meta.generatedAt).toLocaleString('vi-VN');
-      renderAll();
-      document.getElementById('loading').style.display = 'none';
+      try {
+        DATA = data;
+        document.getElementById('metaLine').textContent =
+          data.meta.name + ' · cập nhật lúc ' + new Date(data.meta.generatedAt).toLocaleString('vi-VN');
+        renderAll();
+      } catch (err) {
+        console.error('Dashboard render failed', err);
+        const banner = document.getElementById('errorBanner');
+        banner.textContent = 'Lỗi hiển thị dashboard: ' + (err && err.message ? err.message : err);
+        banner.style.display = 'block';
+      } finally {
+        // Always clear the overlay, even if rendering above threw - an
+        // exception here must never leave the user staring at a spinner
+        // with no explanation.
+        document.getElementById('loading').style.display = 'none';
+      }
     })
     .withFailureHandler(function(err){
       document.getElementById('loading').style.display = 'none';
