@@ -53,7 +53,7 @@ function str_(v) {
 
 function normalizeAscii_(v) {
   return String(v || '')
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().trim();
 }
 
