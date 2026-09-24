@@ -19,6 +19,19 @@ Skill xử lý Excel toàn diện:
 - Làm sạch và định dạng dữ liệu
 - Thêm công thức, biểu đồ vào Excel
 
+### viet-ve-dang
+Skill tổng hợp: viết bài → tạo ảnh → làm video → đăng (một lệnh, một chủ đề, máy làm trọn bộ):
+- Hai chế độ: THƯỜNG (chạy ngoài lớp, dừng trước đăng) và LỚP (demo trực tiếp, tự động đăng)
+- Viết caption, tạo ảnh 4:5, tạo tiếng (Google TTS), làm video storyboard 9:16, đăng fanpage + YouTube Short
+- Gọi các skill con: viet-giong-eroca · ve-anh-chon-duong · doc-thanh-tieng · fanpage-post · dang-video-tiktok-short
+- Tất cả chặng có dự phòng (Hermes + Gemini cho text, Codex + Hermes slide cho ảnh, OmniVoice cho tiếng)
+- Đóng vai điều phối, không chép ruột skill con
+
+**Sử dụng khi:**
+- Owner nói "viết vẽ đăng", "/viet-ve-dang", "làm mẫu trọn bộ từ chủ đề", "đăng bài fanpage tóm tắt buổi này"
+- Đang chiếu màn hình demo trước lớp (chế độ LỚP: tự động đăng, không hỏi)
+- Ngoài lớp (chế độ THƯỜNG: dừng trước cửa đăng, cần `--dong-y`)
+
 ## Quy ước
 
 ### Tiêu chuẩn Excel
