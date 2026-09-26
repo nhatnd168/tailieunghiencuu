@@ -428,7 +428,7 @@ Ký hiệu nguồn đáp ứng: **CS** = có sẵn trong WeKnora; **CH** = cấu
 | Storage API, Storage Service | `internal/application/service/file/` | Dùng MinIO |
 | Bộ kết nối dữ liệu (phát triển mới) | `internal/datasource/connector/` | Viết connector Google Drive theo `CONNECTOR_IMPLEMENTATION_GUIDE.md` |
 | Siêu dữ liệu, trích xuất | `internal/application/service/extract.go`, `knowledge_process_config.go` | Điểm gắn cổng kiểm tra chuẩn |
-| Đánh giá chất lượng | `internal/application/service/evaluation.go`, `metric/` | Nạp bộ 200 câu hỏi chuẩn |
+| Đánh giá chất lượng | `internal/application/service/evaluation.go` và `internal/application/service/metric/` | Nạp bộ 200 câu hỏi chuẩn |
 
 ### Phụ lục B. Thuật ngữ
 
