@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Báo Cáo Digital Marketing</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+--green:#0C2723; --green2:#1f5047; --green3:#2b7a6f; --green4:#4a9d8f; --green5:#7eb3a1;
+--amber:#C8860C; --red:#B23A2E; --ok:#2E7D52;
+--ink:#14201d; --ink2:#4a5a56; --muted:#7d8d89;
+--line:#e3e8e6; --bg:#f4f6f5; --card:#ffffff; --gold:#B9975B;
+}
+:root:not([data-theme="light"]){}
+@media (prefers-color-scheme:dark){
+:root:not([data-theme="light"]){
+--ink:#e7ece9; --ink2:#aeb9b5; --muted:#8a9793; --line:#2a3a35; --bg:#0c1513; --card:#132019;
+--green5:#8fc3b1;
+}
+}
+:root[data-theme="dark"]{
+--ink:#e7ece9; --ink2:#aeb9b5; --muted:#8a9793; --line:#2a3a35; --bg:#0c1513; --card:#132019; --green5:#8fc3b1;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);line-height:1.6;font-size:15px}
+.wrap{max-width:1080px;margin:0 auto;padding:24px 16px 80px}
+.hero{background:linear-gradient(135deg,var(--green) 0%,var(--green2) 100%);color:#fff;border-radius:16px;padding:40px 32px;margin-bottom:28px;position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-60px;top:-60px;width:240px;height:240px;border:1px solid rgba(185,151,91,.25);border-radius:50%}
+.hero::before{content:"";position:absolute;right:10px;bottom:-80px;width:180px;height:180px;border:1px solid rgba(255,255,255,.08);border-radius:50%}
+.brandline{font-size:12px;letter-spacing:3px;color:var(--gold);font-weight:600;margin-bottom:14px}
+.hero h1{font-size:28px;line-height:1.25;font-weight:800;margin-bottom:10px;max-width:760px}
+.hero .sub{font-size:14px;color:rgba(255,255,255,.82);max-width:680px}
+.hero .meta{margin-top:18px;display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);padding:5px 12px;border-radius:20px;font-size:12px}
+.tag-conf{background:var(--gold);color:var(--green);font-weight:700}
+h2{font-size:12px;letter-spacing:2px;color:var(--green3);font-weight:700;text-transform:uppercase;margin:0 0 4px}
+.sec{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px;margin-bottom:22px}
+.sec-title{font-size:21px;font-weight:800;color:var(--ink);margin-bottom:6px;letter-spacing:-.3px}
+.sec-desc{color:var(--ink2);font-size:14px;margin-bottom:20px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:8px}
+.kpi{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:18px;border-left:4px solid var(--green3)}
+.kpi .l{font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:8px}
+.kpi .v{font-size:26px;font-weight:800;color:var(--green);line-height:1.1}
+.kpi .d{font-size:12px;color:var(--ink2);margin-top:5px}
+.kpi.alt{border-left-color:var(--gold)}
+.kpi.warn{border-left-color:var(--amber)}
+.kpi.bad{border-left-color:var(--red)}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px}
+th{text-align:left;padding:12px 10px;font-size:11px;letter-spacing:.5px;text-transform:uppercase;color:var(--green3);border-bottom:2px solid var(--line);font-weight:700}
+td{padding:11px 10px;border-bottom:1px solid var(--line)}
+td.r,th.r{text-align:right}
+tbody tr:hover{background:var(--bg)}
+.num{font-variant-numeric:tabular-nums;font-weight:600}
+.chart-box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-top:16px}
+.chart-box h3{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.bluf{border-left:4px solid var(--gold);background:linear-gradient(90deg,rgba(185,151,91,.08),transparent);padding:16px 18px;border-radius:8px;margin-bottom:14px}
+.bluf b{color:var(--green3)}
+.funnel{display:flex;flex-direction:column;gap:3px;margin:8px 0}
+.fstep{display:flex;align-items:center;gap:12px}
+.fbar{height:46px;border-radius:8px;display:flex;align-items:center;padding:0 16px;color:#fff;font-weight:700;font-size:14px;white-space:nowrap}
+.fmeta{font-size:13px;color:var(--ink2)}
+.scorecard td:first-child{font-weight:600}
+.badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:12px;font-weight:700;white-space:nowrap}
+.b-ok{background:rgba(46,125,82,.14);color:var(--ok)}
+.b-warn{background:rgba(200,134,12,.16);color:var(--amber)}
+.b-bad{background:rgba(178,58,46,.14);color:var(--red)}
+.roadmap{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:8px}
+.phase{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:18px;border-top:4px solid var(--green3)}
+.phase:nth-child(2){border-top-color:var(--green4)}
+.phase:nth-child(3){border-top-color:var(--gold)}
+.phase .pn{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:700}
+.phase h4{font-size:15px;color:var(--green);margin:4px 0 10px}
+.phase ul{list-style:none;font-size:13px;color:var(--ink2)}
+.phase li{padding:6px 0 6px 20px;position:relative;border-bottom:1px solid var(--line)}
+.phase li:last-child{border-bottom:none}
+.phase li::before{content:"";position:absolute;left:0;top:13px;width:8px;height:8px;border-radius:2px;background:var(--green4)}
+.callout{background:var(--green);color:#fff;border-radius:12px;padding:22px 24px;margin-top:4px}
+.callout .big{font-size:30px;font-weight:800;color:var(--gold);line-height:1.1}
+.callout p{color:rgba(255,255,255,.85);font-size:14px;margin-top:6px}
+.note{font-size:12.5px;color:var(--muted);margin-top:14px;padding-top:12px;border-top:1px dashed var(--line)}
+.foot{text-align:center;color:var(--muted);font-size:12px;margin-top:30px;line-height:1.8}
+.foot b{color:var(--ink2)}
+@media (max-width:760px){
+.grid2{grid-template-columns:1fr}.roadmap{grid-template-columns:1fr}
+.hero h1{font-size:22px}.sec{padding:18px}.hero{padding:28px 20px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="hero">
+<div class="brandline">XCONS E&amp;C — WE BUILD YOUR DREAM</div>
+<h1>Báo Cáo Thẩm Định Digital Marketing &amp; Chân Dung Khách Hàng</h1>
+<div class="sub">Đánh giá hiệu quả phòng Marketing tháng 09/2026 · Đối soát dữ liệu quảng cáo Meta Ads với phễu chuyển đổi 3.776 khách hàng GetFly CRM · Đề xuất chiến lược thực thi</div>
+<div class="meta">
+<span class="chip tag-conf">MẬT — NỘI BỘ BAN GIÁM ĐỐC</span>
+<span class="chip">Kỳ: Tháng 09/2026</span>
+<span class="chip">Nguồn: Meta Ads API + GetFly CRM</span>
+<span class="chip">Lập: 06/10/2026</span>
+</div>
+</div>
+
+<!-- BLUF -->
+<div class="sec">
+<h2>Tóm tắt điều hành — BLUF</h2>
+<div class="sec-title">Ba kết luận cốt lõi cho Ban Giám Đốc</div>
+<div class="bluf"><b>1. Marketing giỏi kéo người vào, nhưng kéo nhầm người.</b> Tỷ lệ click 2,84% tháng 9 cao hơn chuẩn ngành xây dựng (~1,5–2%), chứng tỏ năng lực sáng tạo nội dung tốt. Nhưng 66,4% khách đổ về là Nhà phố, trong khi quảng cáo và lợi nhuận lại nằm ở Biệt thự (18,7%). Đây là lỗi <b>nhắm mục tiêu</b>, không phải lỗi nội dung.</div>
+<div class="bluf"><b>2. Hệ thống phụ thuộc một kênh, một tài khoản.</b> 99,8% ngân sách chạy trên Facebook, gần như bỏ trống Instagram và các kênh khác. 82,9% ngân sách dồn vào một tài khoản. Rủi ro tập trung cao: một sự cố khóa tài khoản là dừng toàn bộ nguồn lead.</div>
+<div class="bluf"><b>3. Điểm thất thoát không nằm ở tiền quảng cáo, mà ở chất lượng phễu.</b> Tỷ lệ rớt 51,4%; trong đó ≥545 lead (28% số rớt) là do hút sai tệp — thuộc trách nhiệm Marketing. Vá đúng khâu này có giá trị lớn hơn nhiều so với tăng ngân sách.</div>
+</div>
+
+<!-- SECTION 1: Ads performance -->
+<div class="sec">
+<h2>Phần 1 — Thẩm định hiệu suất quảng cáo</h2>
+<div class="sec-title">Kết quả Meta Ads toàn hệ thống tháng 09</div>
+<div class="sec-desc">Số liệu thực tế trích xuất từ Meta Ads API cho toàn bộ tài khoản quảng cáo XCONS E&amp;C.</div>
+<div class="kpis">
+<div class="kpi"><div class="l">Tổng chi phí</div><div class="v">74,5 Tr</div><div class="d">VND · tháng 9</div></div>
+<div class="kpi alt"><div class="l">Lượt hiển thị</div><div class="v">756K</div><div class="d">Impressions</div></div>
+<div class="kpi alt"><div class="l">Lượt click</div><div class="v">21.507</div><div class="d">Clicks</div></div>
+<div class="kpi"><div class="l">Tỷ lệ click (CTR)</div><div class="v">2,84%</div><div class="d">Trên chuẩn ngành</div></div>
+<div class="kpi warn"><div class="l">Giá mỗi click</div><div class="v">3.462</div><div class="d">VND/click</div></div>
+</div>
+<table>
+<thead><tr><th>Tài khoản (Page)</th><th class="r">Chi phí (VND)</th><th class="r">Tỷ trọng</th><th class="r">Click</th><th class="r">CTR</th><th class="r">CPC (VND)</th></tr></thead>
+<tbody>
+<tr><td>XCONS E&amp;C (chính)</td><td class="r num">61.721.118</td><td class="r num">82,9%</td><td class="r num">17.974</td><td class="r num">2,79%</td><td class="r num">3.434</td></tr>
+<tr><td>Interior</td><td class="r num">5.898.971</td><td class="r num">7,9%</td><td class="r num">2.295</td><td class="r num">3,63%</td><td class="r num">2.570</td></tr>
+<tr><td>Construction</td><td class="r num">6.848.303</td><td class="r num">9,2%</td><td class="r num">1.238</td><td class="r num">2,58%</td><td class="r num">5.532</td></tr>
+<tr><td>Careers / Cá nhân</td><td class="r num">0</td><td class="r num">—</td><td class="r num">—</td><td class="r num">—</td><td class="r num">—</td></tr>
+</tbody>
+</table>
+<div class="grid2">
+<div class="chart-box"><h3>Phân bổ ngân sách theo tài khoản</h3><canvas id="spendChart" height="220"></canvas></div>
+<div class="chart-box"><h3>Hiệu quả: CTR vs CPC từng tài khoản</h3><canvas id="effChart" height="220"></canvas></div>
+</div>
+<div class="note">Phát hiện kênh: tài khoản chính chi 61,6 triệu trên Facebook và chỉ 112 nghìn trên Instagram (0,2%). Toàn hệ thống gần như độc canh Facebook — chưa khai thác Instagram, TikTok, YouTube, Google.</div>
+</div>
+
+<!-- SECTION 2: Funnel mismatch -->
+<div class="sec">
+<h2>Phần 2 — Chẩn đoán cốt lõi</h2>
+<div class="sec-title">Khoảng vênh phễu: hút Biệt thự, nhận Nhà phố</div>
+<div class="sec-desc">Đối soát thông điệp quảng cáo (hình ảnh Villa triệu đô) với loại hình công trình thực tế đổ về CRM.</div>
+<div class="funnel" id="funnel"></div>
+<div class="grid2" style="margin-top:18px">
+<div class="chart-box"><h3>Loại hình công trình khách đổ về (CRM)</h3><canvas id="typeChart" height="240"></canvas></div>
+<div class="chart-box"><h3>Top lý do từ chối (1.676 hồ sơ)</h3><canvas id="lostChart" height="240"></canvas></div>
+</div>
+<div class="note">Marketing tập trung &gt;80% nội dung vào Biệt thự, nhưng chỉ 18,7% khách đổ về là Biệt thự. Hệ quả trực tiếp: 301 lead rác + 244 lead sai phân khúc = 545 lead hút sai (28% tổng số rớt) — đây là chỉ số Marketing phải chịu trách nhiệm, tách bạch khỏi khâu bán hàng.</div>
+</div>
+
+<!-- SECTION 3: Customer segment -->
+<div class="sec">
+<h2>Phần 3 — Chân dung &amp; phân khúc khách hàng</h2>
+<div class="sec-title">Ma trận 4 tầng + nhân khẩu học quảng cáo</div>
+<div class="sec-desc">Kết hợp phân khúc giá trị từ CRM với dữ liệu nhân khẩu Meta Ads (tuổi, giới tính).</div>
+<table>
+<thead><tr><th>Phân khúc</th><th class="r">Quy mô</th><th class="r">Ngân sách</th><th>Đặc trưng &amp; hành động Marketing</th></tr></thead>
+<tbody>
+<tr><td><b>TIER 1 — Bespoke Luxury Villa</b></td><td class="r num">707 (18,7%)</td><td class="r num">3,5–25+ tỷ</td><td>~75% biên lợi nhuận. <b>Phải là trọng tâm mới.</b></td></tr>
+<tr><td>TIER 2 — Premium Townhouse</td><td class="r num">1.200 (31,8%)</td><td class="r num">2,0–3,5 tỷ</td><td>Nguồn việc ổn định. Giữ phễu riêng.</td></tr>
+<tr><td>TIER 3 — Standard Townhouse</td><td class="r num">1.306 (34,6%)</td><td class="r num">1,0–1,8 tỷ</td><td>Rớt cao vì giá. Cần phễu giá rõ ràng.</td></tr>
+<tr><td>TIER 4 — Lost / Rác</td><td class="r num">563 (14,9%)</td><td class="r num">&lt;800 Tr</td><td><b>Loại ngay từ đầu phễu bằng bộ lọc.</b></td></tr>
+</tbody>
+</table>
+<div class="grid2" style="margin-top:18px">
+<div class="chart-box"><h3>Phân khúc theo độ tuổi (Meta Ads)</h3><canvas id="ageChart" height="220"></canvas></div>
+<div class="chart-box"><h3>Phân khúc theo giới tính</h3><canvas id="genderChart" height="220"></canvas></div>
+</div>
+<div class="note">Khách lõi: nam giới 35–54 tuổi (hơn 55% hiển thị). Nhóm 55+ có tỷ lệ click cao nhất (3,9–4,3%) — nhóm trả tiền mặt, quyết nhanh, đang bị bỏ sót. Chân dung mục tiêu mới (HNWI 32–48, Quiet Luxury) khớp với dữ liệu quảng cáo hiện tại.</div>
+</div>
+
+<!-- SECTION 4: Scorecard -->
+<div class="sec">
+<h2>Phần 4 — Bảng điểm đánh giá phòng Marketing</h2>
+<div class="sec-title">Thẻ điểm 7 chỉ số cho Ban Giám Đốc</div>
+<div class="sec-desc">Công cụ để Ban Giám Đốc chấm điểm khách quan hiệu quả phòng Marketing tháng 9.</div>
+<table class="scorecard">
+<thead><tr><th>Chỉ số</th><th>Kết quả T9</th><th>Chuẩn tham chiếu</th><th>Đánh giá</th></tr></thead>
+<tbody>
+<tr><td>Năng lực sáng tạo (CTR)</td><td>2,84%</td><td>1,5–2% ngành XD</td><td><span class="badge b-ok">TỐT</span></td></tr>
+<tr><td>Hiệu quả chi phí (CPC)</td><td>3.462 VND</td><td>3.000–4.000</td><td><span class="badge b-ok">ĐẠT</span></td></tr>
+<tr><td>Độ chính xác nhắm tệp</td><td>66% sai phân khúc</td><td>&lt;30% sai</td><td><span class="badge b-bad">YẾU</span></td></tr>
+<tr><td>Đa dạng kênh</td><td>99,8% Facebook</td><td>&le;70% một kênh</td><td><span class="badge b-bad">YẾU</span></td></tr>
+<tr><td>Chất lượng lead (tỷ lệ rớt)</td><td>51,4% rớt</td><td>&lt;40%</td><td><span class="badge b-bad">YẾU</span></td></tr>
+<tr><td>Rủi ro tập trung ngân sách</td><td>82,9% một tài khoản</td><td>&le;60%</td><td><span class="badge b-warn">CẢNH BÁO</span></td></tr>
+<tr><td>Khai thác "quán quân" (Interior)</td><td>CTR cao nhất, chỉ 7,9% NS</td><td>Rót theo hiệu quả</td><td><span class="badge b-warn">BỎ LỠ</span></td></tr>
+</tbody>
+</table>
+<div class="note">Kết luận chấm điểm: Marketing <b>xuất sắc ở đầu phễu</b> (thu hút, sáng tạo) nhưng <b>yếu ở lõi chiến lược</b> (nhắm đúng tệp, đa kênh, chất lượng lead). Đây là hồ sơ điển hình của đội vận hành giỏi nhưng thiếu định hướng phân khúc từ cấp quản trị.</div>
+</div>
+
+<!-- Callout -->
+<div class="sec" style="padding:0;border:none;background:transparent">
+<div class="callout">
+<div class="big">333,7 tỷ VND</div>
+<p>Doanh thu tiềm năng thu hồi nếu giải cứu chỉ 10% trong 1.940 lead từ chối (194 hợp đồng × AOV 1,72 tỷ) — lợi nhuận gộp bổ sung ~93,4 tỷ (biên 28%). Bài toán tăng trưởng không nằm ở đốt thêm tiền quảng cáo, mà ở vá nút thắt chuyển đổi và tái định vị phân khúc.</p>
+</div>
+</div>
+
+<!-- SECTION 5: Roadmap -->
+<div class="sec">
+<h2>Phần 5 — Chiến lược thực thi phòng Marketing</h2>
+<div class="sec-title">Lộ trình 90 ngày</div>
+<div class="sec-desc">Giao việc cụ thể, đo lường được, cho phòng Marketing — ưu tiên vá phễu trước khi mở rộng chi.</div>
+<div class="roadmap">
+<div class="phase">
+<div class="pn">Tháng 1 · Vá phễu</div>
+<h4>Chuẩn hóa nhắm mục tiêu &amp; CRM</h4>
+<ul>
+<li>Tách 2 phễu: Nhà phố 1,5–3 tỷ và Biệt thự &gt;5 tỷ, ngân sách riêng</li>
+<li>Thêm bộ lọc ngân sách ngay ở form/quảng cáo để chặn Tier 4</li>
+<li>Chính sách hoàn 50–100% phí thiết kế khi ký thi công</li>
+<li>Gắn trường "phân khúc" bắt buộc trên GetFly để đo chất lượng lead</li>
+</ul>
+</div>
+<div class="phase">
+<div class="pn">Tháng 2 · Đa kênh &amp; niềm tin</div>
+<h4>Mở kênh &amp; bằng chứng năng lực</h4>
+<ul>
+<li>Kích hoạt Instagram, TikTok, YouTube Shorts — mục tiêu Facebook &le;70%</li>
+<li>Tăng ngân sách tài khoản Interior (quán quân CTR)</li>
+<li>Sản xuất kho video "công trường thực tế" trị nỗi đau niềm tin vật tư</li>
+<li>Thử nghiệm riêng tệp 55+ (CTR cao nhất, quyết nhanh)</li>
+</ul>
+</div>
+<div class="phase">
+<div class="pn">Tháng 3 · Bứt phá VIP</div>
+<h4>Ra mắt phân khúc Bespoke</h4>
+<ul>
+<li>Chiến dịch "XCONS Royal Bespoke" nhắm HNWI 32–48 tại đại đô thị</li>
+<li>Remarketing 472 khách đã báo giá + 443 CSTL</li>
+<li>Landing page + hồ sơ năng lực PDF chuẩn cho tệp biệt thự</li>
+<li>Báo cáo Marketing theo CPL/CAC từng phân khúc, không chỉ CTR</li>
+</ul>
+</div>
+</div>
+<div class="note">Nguyên tắc đo lường mới: chuyển KPI phòng Marketing từ chỉ số phù phiếm (lượt xem, click) sang <b>chi phí mỗi lead đúng phân khúc (CPQL)</b> và <b>tỷ lệ lead chuyển sang báo giá</b>. Đây là thước đo gắn Marketing với doanh thu thực.</div>
+</div>
+
+<div class="foot">
+<b>CÔNG TY TNHH XCONS E&amp;C</b><br>
+159 Đường số 05, KP03, Phường An Khánh, TP. Hồ Chí Minh · Hotline: 0918667499 · xconsenc.com.vn<br>
+Nguồn dữ liệu: Meta Ads API (quảng cáo T9/2026) + GetFly CRM (3.776 khách hàng). Số liệu CRM do phòng kinh doanh cung cấp, chưa đối soát độc lập qua công cụ.
+</div>
+
+</div>
+
+<script>
+const G={green:'#0C2723',g3:'#2b7a6f',g4:'#4a9d8f',g5:'#7eb3a1',amber:'#C8860C',red:'#B23A2E',gold:'#B9975B'};
+const dark=window.matchMedia&&window.matchMedia('(prefers-color-scheme:dark)').matches&&document.documentElement.getAttribute('data-theme')!=='light';
+const ink=dark?'#aeb9b5':'#4a5a56', grid=dark?'rgba(255,255,255,.07)':'rgba(0,0,0,.06)';
+Chart.defaults.font.family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif";
+Chart.defaults.color=ink;Chart.defaults.font.size=12;
+const vnd=v=>new Intl.NumberFormat('vi-VN').format(v);
+
+new Chart(spendChart,{type:'doughnut',data:{labels:['XCONS E&C chính','Construction','Interior'],
+datasets:[{data:[61721118,6848303,5898971],backgroundColor:[G.green,G.amber,G.g4],borderColor:dark?'#132019':'#fff',borderWidth:3}]},
+options:{plugins:{legend:{position:'bottom',labels:{usePointStyle:true,pointStyle:'circle',padding:14}},
+tooltip:{callbacks:{label:c=>c.label+': '+vnd(c.raw)+' VND ('+(c.raw/74468392*100).toFixed(1)+'%)'}}},cutout:'58%'}});
+
+new Chart(effChart,{data:{labels:['Chính','Interior','Construction'],
+datasets:[{type:'bar',label:'CPC (VND)',data:[3434,2570,5532],backgroundColor:G.green,borderRadius:5,yAxisID:'y',order:2},
+{type:'line',label:'CTR (%)',data:[2.79,3.63,2.58],borderColor:G.gold,backgroundColor:G.gold,borderWidth:2,pointRadius:5,yAxisID:'y1',order:1,tension:.2}]},
+options:{plugins:{legend:{position:'bottom',labels:{usePointStyle:true,padding:14}}},
+scales:{y:{position:'left',grid:{color:grid},title:{display:true,text:'CPC (VND)'}},
+y1:{position:'right',grid:{display:false},title:{display:true,text:'CTR (%)'}},x:{grid:{display:false}}}}});
+
+new Chart(typeChart,{type:'bar',data:{labels:['Nhà phố','Biệt thự','BT sân vườn','Nhà cấp 4','Khác'],
+datasets:[{data:[66.4,16.1,2.6,5.5,9.4],backgroundColor:[G.amber,G.green,G.g3,G.red,G.g5],borderRadius:5}]},
+options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+'%'}}},
+scales:{x:{grid:{color:grid},ticks:{callback:v=>v+'%'}},y:{grid:{display:false}}}}});
+
+new Chart(lostChart,{type:'bar',data:{labels:['Không nhu cầu','Chọn cty khác','Sai phân khúc','Không liên hệ đc','Nhà đã xây','Phí TK cao'],
+datasets:[{data:[301,297,244,227,196,48],backgroundColor:[G.red,G.amber,G.red,G.g3,G.g4,G.amber],borderRadius:5}]},
+options:{indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:grid}},y:{grid:{display:false}}}}});
+
+new Chart(ageChart,{type:'bar',data:{labels:['18-24','25-34','35-44','45-54','55-64','65+'],
+datasets:[{label:'Tỷ lệ hiển thị (%)',data:[5.9,22.6,33.2,22.3,11.0,5.0],backgroundColor:[G.g5,G.g4,G.green,G.g3,G.amber,G.gold],borderRadius:5}]},
+options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.raw+'%'}}},
+scales:{y:{grid:{color:grid},ticks:{callback:v=>v+'%'}},x:{grid:{display:false}}}}});
+
+new Chart(genderChart,{type:'doughnut',data:{labels:['Nam','Nữ','Không xác định'],
+datasets:[{data:[71.1,28.2,0.6],backgroundColor:[G.green,G.gold,G.g5],borderColor:dark?'#132019':'#fff',borderWidth:3}]},
+options:{plugins:{legend:{position:'bottom',labels:{usePointStyle:true,pointStyle:'circle',padding:14}},
+tooltip:{callbacks:{label:c=>c.label+': '+c.raw+'%'}}},cutout:'58%'}});
+
+// Funnel
+const steps=[['3.776 Lead đổ về',3776,G.green],['2.506 là Nhà phố (66,4%)',2506,G.amber],['1.940 từ chối / rớt (51,4%)',1940,G.red],['707 Biệt thự — tệp lợi nhuận (18,7%)',707,G.g3],['100 hợp đồng ký · 66,9 tỷ',100,G.gold]];
+const max=3776;
+funnel.innerHTML=steps.map(s=>`<div class="fstep"><div class="fbar" style="background:${s[2]};width:${Math.max(s[1]/max*100,22)}%">${s[0]}</div></div>`).join('');
+</script>
+</body>
+</html>
